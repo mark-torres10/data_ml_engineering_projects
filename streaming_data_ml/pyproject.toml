@@ -1,0 +1,31 @@
+[project]
+name = "streaming-data-ml"
+version = "0.1.0"
+description = "Streaming micro-trend detection pipeline using Kafka and Faust."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "faust-streaming>=0.10.13",
+    "aiokafka>=0.10.0",
+    "pydantic>=2.7.0",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[build-system]
+requires = ["setuptools>=67.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[tool.uv.scripts]
+run-faust = "faust -A streaming_data_ml.pipeline worker -l info"
+run-generator = "python -m streaming_data_ml.generators.social_post_stream"
+run-tests = "pytest"
+
