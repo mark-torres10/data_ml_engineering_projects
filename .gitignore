@@ -1,0 +1,32 @@
+# General Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.dist-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build artifacts
+build/
+dist/
+
+# IDE/editor settings
+.idea/
+.vscode/
+.DS_Store
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# uv lockfiles (generated per project)
+uv.lock
+
