@@ -72,6 +72,34 @@ class Config:
     MODEL_VERSION = os.getenv("MODEL_VERSION", "v1")
     ENDPOINT_NAME = os.getenv("ENDPOINT_NAME", "titanic-prediction-endpoint")
     
+    # Artifact Registry Configuration
+    ARTIFACT_REGISTRY_REPO = os.getenv("ARTIFACT_REGISTRY_REPO", "titanic-ml-repo")
+    TRAINING_IMAGE_NAME = os.getenv("TRAINING_IMAGE_NAME", "xgboost-training")
+    PREDICTION_IMAGE_NAME = os.getenv("PREDICTION_IMAGE_NAME", "xgboost-prediction")
+    
+    @property
+    def TRAINING_IMAGE_URI(self):
+        """Get full training container image URI."""
+        return (
+            f"{self.GCP_REGION}-docker.pkg.dev/"
+            f"{self.GCP_PROJECT_ID}/{self.ARTIFACT_REGISTRY_REPO}/"
+            f"{self.TRAINING_IMAGE_NAME}:latest"
+        )
+    
+    @property
+    def PREDICTION_IMAGE_URI(self):
+        """Get full prediction container image URI."""
+        return (
+            f"{self.GCP_REGION}-docker.pkg.dev/"
+            f"{self.GCP_PROJECT_ID}/{self.ARTIFACT_REGISTRY_REPO}/"
+            f"{self.PREDICTION_IMAGE_NAME}:latest"
+        )
+    
+    # Training Configuration
+    TRAINING_MACHINE_TYPE = os.getenv("TRAINING_MACHINE_TYPE", "n1-standard-4")
+    TRAINING_REPLICA_COUNT = int(os.getenv("TRAINING_REPLICA_COUNT", "1"))
+    USE_GPU_TRAINING = os.getenv("USE_GPU_TRAINING", "False").lower() in ("true", "1", "yes")
+    
     # Application Settings
     DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

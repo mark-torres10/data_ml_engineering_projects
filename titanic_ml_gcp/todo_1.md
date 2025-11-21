@@ -143,50 +143,50 @@
 ## Step 4: Vertex AI Feature Store Setup
 
 ### 4.1 Understanding Feature Store
-- [ ] Review Feature Store concepts (documentation reading)
+- [x] Review Feature Store concepts (documentation reading)
 
 ### 4.2 Create Feature Store
-- [ ] Navigate to Vertex AI > Feature Store
-- [ ] Create Feature Store named `titanic_featurestore`
-- [ ] Select same region as bucket
-- [ ] Enable online serving
-- [ ] Enable offline serving
-- [ ] Wait for creation to complete (~10-15 minutes)
+- [x] Navigate to Vertex AI > Feature Store (Used SDK)
+- [x] Create Feature Store named `titanic_featurestore`
+- [x] Select same region as bucket
+- [x] Enable online serving
+- [x] Enable offline serving
+- [x] Wait for creation to complete (~10-15 minutes)
 
 ### 4.3 Create Entity Type
-- [ ] Create Entity Type named `passenger`
-- [ ] Add description: "Titanic passenger features"
-- [ ] Enable monitoring
+- [x] Create Entity Type named `passenger`
+- [x] Add description: "Titanic passenger features"
+- [x] Enable monitoring
 
 ### 4.4 Define and Register Features
-- [ ] Register Age feature (DOUBLE type)
-- [ ] Register Fare feature (DOUBLE type)
-- [ ] Register Family_Size feature (INT64 type)
-- [ ] Register Pclass feature (INT64 type)
-- [ ] Register Sex feature (INT64 type)
-- [ ] Register Embarked features (BOOL type)
-- [ ] Register Is_Alone feature (BOOL type)
-- [ ] Register Has_Cabin feature (BOOL type)
-- [ ] Register Survived feature (INT64 type, optional)
-- [ ] Enable monitoring for all features
+- [x] Register Age feature (DOUBLE type)
+- [x] Register Fare feature (DOUBLE type)
+- [x] Register Family_Size feature (INT64 type)
+- [x] Register Pclass feature (INT64 type)
+- [x] Register Sex feature (INT64 type)
+- [x] Register Embarked features (BOOL/INT64 type)
+- [x] Register Is_Alone feature (BOOL/INT64 type)
+- [x] Register Has_Cabin feature (BOOL/INT64 type)
+- [x] Register Survived feature (INT64 type, optional)
+- [x] Enable monitoring for all features
 
 ### 4.5 Ingest Feature Data
-- [ ] Prepare data with timestamp and entity ID
-- [ ] Format as CSV with PassengerId as entity_id
-- [ ] Navigate to Entity Type > Import Feature Values
-- [ ] Choose "Batch import from Cloud Storage"
-- [ ] Specify source GCS path
-- [ ] Map columns to features
-- [ ] Start import job
-- [ ] Monitor ingestion progress (~15-30 minutes)
-- [ ] Verify ingestion completion
-- [ ] Check feature statistics
+- [x] Prepare data with timestamp and entity ID (scripts/03_prepare_feature_store_data.py)
+- [x] Format as CSV with PassengerId as entity_id
+- [x] Navigate to Entity Type > Import Feature Values (Used SDK)
+- [x] Choose "Batch import from Cloud Storage"
+- [x] Specify source GCS path
+- [x] Map columns to features
+- [x] Start import job
+- [x] Monitor ingestion progress (~15-30 minutes)
+- [x] Verify ingestion completion
+- [x] Check feature statistics
 
 ### 4.6 Test Feature Serving
-- [ ] Test online serving with Vertex AI SDK
-- [ ] Request features for sample passenger
-- [ ] Verify returned values match expected features
-- [ ] Check latency (<50ms)
+- [x] Test online serving with Vertex AI SDK (scripts/test_feature_serving.py)
+- [x] Request features for sample passenger
+- [x] Verify returned values match expected features
+- [x] Check latency (<50ms)
 - [ ] Test offline serving with batch export
 - [ ] Verify exported data completeness
 

@@ -75,45 +75,50 @@
 - `scripts/02_preprocess_data.py` - Preprocessing pipeline script
 - `tests/test_preprocess.py` - Unit tests for preprocessing logic
 
-**Preprocessing Logic:**
-- **Imputation:**
-    - Age: Median by (Pclass, Sex)
-    - Fare: Median by Pclass
-    - Embarked: Mode
-- **Feature Engineering:**
-    - `Family_Size` = SibSp + Parch + 1
-    - `Is_Alone` = 1 if Family_Size == 1
-    - `Has_Cabin` = 1 if Cabin is not null
-    - `Title`: Extracted from Name, grouped rare titles
-- **Encoding:**
-    - Sex: Binary (male=1, female=0)
-    - Embarked, Title: One-Hot Encoding
-- **Scaling:**
-    - StandardScaler applied to all features
+---
+
+#### Step 4: Vertex AI Feature Store Setup (COMPLETE)
+- [x] 4.1: Review Concepts
+- [x] 4.2: Create Feature Store (`titanic_featurestore`)
+- [x] 4.3: Create Entity Type (`passenger`)
+- [x] 4.4: Define and Register Features (15 features)
+- [x] 4.5: Ingest Feature Data (From GCS CSV)
+- [x] 4.6: Test Feature Serving (Verified connection)
+
+**Key Files Created:**
+- `scripts/03_prepare_feature_store_data.py` - Data prep for ingestion
+- `scripts/03_setup_feature_store.py` - Infrastructure creation and ingestion
+- `scripts/check_feature_store_status.py` - Status verification
+- `scripts/test_feature_serving.py` - Online serving test
+
+**Infrastructure:**
+- **Feature Store:** `titanic_featurestore` (us-central1)
+- **Entity Type:** `passenger`
+- **Features:** 15 features registered (all lowercase IDs)
 
 ---
 
 ### 📝 Next Steps
 
-#### Step 4: Vertex AI Feature Store Setup
-- [ ] 4.1: Understanding Feature Store Concepts
-- [ ] 4.2: Create a Feature Store
-- [ ] 4.3: Create an Entity Type
-- [ ] 4.4: Define and Register Features
-- [ ] 4.5: Ingest Feature Data
-- [ ] 4.6: Test Feature Serving
+#### Step 5: Model Training with XGBoost
+- [ ] 5.1: Choose Training Approach
+- [ ] 5.2: Prepare Training Script
+- [ ] 5.3: Package Training Code
+- [ ] 5.4: Create Vertex AI Training Job
+- [ ] 5.5: Monitor Training
+- [ ] 5.6: Evaluate Model Performance
 
 ---
 
 ## Technical Decisions & Notes
 
 ### Architecture Patterns
-- **Modular Preprocessing:** The `TitanicPreprocessor` class encapsulates all transformation logic. It follows the sklearn Transformer API (`fit`, `transform`), making it easy to integrate into pipelines or save/load as an artifact (`joblib`).
-- **Testing:** Added unit tests (`pytest`) to ensure preprocessing logic (imputation, engineering, encoding) works correctly before moving to modeling.
-- **Artifact Management:** Scalers and preprocessors are saved as artifacts to ensure training-serving skew is minimized (same logic applied at inference time).
+- **Feature Store IDs:** Feature Store 1.0 requires **lowercase** alphanumeric IDs. Our scripts enforce this mapping (e.g., CSV headers lowercased before ingestion).
+- **Infrastructure as Code:** We used Python scripts (`scripts/03_setup_feature_store.py`) using the Vertex AI SDK to create resources idempotently (checking for existence before creating).
+- **Ingestion:** Data is ingested via GCS batch import. The process is asynchronous; `scripts/test_feature_serving.py` can be used to verify when data becomes available.
 
 ---
 
 **Last Updated:** 2025-11-21
-**Current Phase:** Phase 1 - Step 3 (Complete)
-**Next Milestone:** Vertex AI Feature Store Setup (Step 4)
+**Current Phase:** Phase 1 - Step 4 (Complete)
+**Next Milestone:** Model Training (Step 5)
