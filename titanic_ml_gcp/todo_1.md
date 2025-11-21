@@ -58,9 +58,9 @@
 ## Step 2: Data Acquisition and Exploration
 
 ### 2.1 Load Titanic Dataset
-- [ ] Load dataset from HuggingFace using datasets library
-- [ ] Access train and test splits
-- [ ] Convert to pandas DataFrames
+- [x] Load dataset from HuggingFace using datasets library
+- [x] Access train and test splits
+- [x] Convert to pandas DataFrames
 
 ### 2.2 Exploratory Data Analysis (EDA)
 - [ ] Create `notebooks/01_eda.ipynb`
@@ -77,16 +77,16 @@
 - [ ] Document key insights
 
 ### 2.3 Create GCS Bucket
-- [ ] Navigate to "Cloud Storage" > "Buckets"
-- [ ] Create bucket named `titanic-ml-data-YOUR_PROJECT_ID`
-- [ ] Select region matching default region
-- [ ] Choose Standard storage class
-- [ ] Set access control to "Uniform"
-- [ ] Create folder structure: `data/raw/`, `data/processed/`, `models/`, `predictions/`
-- [ ] Save DataFrames as CSV files
-- [ ] Upload train data to `gs://YOUR_BUCKET/data/raw/titanic_train.csv`
-- [ ] Upload test data to `gs://YOUR_BUCKET/data/raw/titanic_test.csv`
-- [ ] Test GCS access with Python google-cloud-storage library
+- [x] Navigate to "Cloud Storage" > "Buckets"
+- [x] Create bucket named `titanic-ml-data-YOUR_PROJECT_ID`
+- [x] Select region matching default region
+- [x] Choose Standard storage class
+- [x] Set access control to "Uniform"
+- [x] Create folder structure: `data/raw/`, `data/processed/`, `models/`, `predictions/`
+- [x] Save DataFrames as CSV files
+- [x] Upload train data to `gs://YOUR_BUCKET/data/raw/titanic_train.csv`
+- [x] Upload test data to `gs://YOUR_BUCKET/data/raw/titanic_test.csv`
+- [x] Test GCS access with Python google-cloud-storage library (gcloud CLI working)
 
 ---
 
