@@ -29,26 +29,24 @@
 - [x] Converted to pandas DataFrames
 - [x] Saved data locally to `data/raw/`
 
-**Dataset Info:**
-- Training samples: 891
-- Test samples: 418
-- Features: 12 (PassengerId, Survived, Pclass, Name, Sex, Age, SibSp, Parch, Ticket, Fare, Cabin, Embarked)
-- Survival rate: 38.38%
-- Missing data: Age (19.9%), Cabin (77.1%), Embarked (0.2%)
-
 **Key Files Created:**
-- `src/data/__init__.py` - Data module initialization
 - `src/data/loader.py` - Reusable TitanicDataLoader class
 - `scripts/01_load_and_save_data.py` - Data loading pipeline script
-- `data/raw/titanic_train.csv` - Training data (local)
-- `data/raw/titanic_test.csv` - Test data (local)
 
-**Features:**
-- Fallback mechanisms for multiple dataset sources
-- Support for HuggingFace datasets library and direct CSV loading
-- Comprehensive metadata and statistics
-- Convenience functions for quick operations
-- Proper logging and error handling
+---
+
+#### Step 2.2: Exploratory Data Analysis (COMPLETE)
+- [x] Created comprehensive EDA notebook `notebooks/01_eda.ipynb`
+- [x] Analyzed missing data patterns
+- [x] Visualized feature distributions
+- [x] Identified key insights:
+    - Sex is strongest predictor (74% vs 19% survival)
+    - Pclass is 2nd strongest (1st >> 3rd)
+    - Fare is positively correlated
+    - Age: Children have higher survival
+
+**Key Files Created:**
+- `notebooks/01_eda.ipynb` - Executed notebook with visualizations
 
 ---
 
@@ -59,52 +57,43 @@
 - [x] Created folder structure: `data/raw/`, `data/processed/`, `models/`, `predictions/`
 - [x] Uploaded training and test data to GCS
 
-**Bucket Structure:**
-```
-gs://titanic-ml-data-titanic-ml-gcp/
-├── data/
-│   ├── processed/
-│   │   └── .gitkeep
-│   └── raw/
-│       ├── titanic_test.csv
-│       └── titanic_train.csv
-├── models/
-│   └── .gitkeep
-└── predictions/
-    └── .gitkeep
-```
-
 **Key Files Created:**
 - `src/utils/gcs_utils.py` - GCS operations manager (comprehensive utilities)
 
-**GCS Manager Features:**
-- Upload/download files
-- List files with prefix filtering
-- File existence checks
-- Get file metadata
-- Upload entire directories
-- Generate signed URLs
-- Convenience functions for common operations
-
 ---
 
-### 🔄 Skipped (For Now)
+#### Step 3: Data Preprocessing and Feature Engineering (COMPLETE)
+- [x] 3.1: Handle Missing Values (Age, Cabin, Embarked, Fare)
+- [x] 3.2: Feature Engineering (Title, Family_Size, Is_Alone, Bins)
+- [x] 3.3: Encode Categorical Variables (Sex, Embarked, Title)
+- [x] 3.4: Feature Scaling (StandardScaler)
+- [x] 3.5: Create Final Feature Set
+- [x] 3.6: Save Processed Data (Local + GCS)
 
-#### Step 2.2: Exploratory Data Analysis (SKIPPED)
-- Will be completed later as needed
-- Dataset statistics already available via `TitanicDataLoader.display_info()`
+**Key Files Created:**
+- `src/features/preprocess.py` - Modular `TitanicPreprocessor` class
+- `scripts/02_preprocess_data.py` - Preprocessing pipeline script
+- `tests/test_preprocess.py` - Unit tests for preprocessing logic
+
+**Preprocessing Logic:**
+- **Imputation:**
+    - Age: Median by (Pclass, Sex)
+    - Fare: Median by Pclass
+    - Embarked: Mode
+- **Feature Engineering:**
+    - `Family_Size` = SibSp + Parch + 1
+    - `Is_Alone` = 1 if Family_Size == 1
+    - `Has_Cabin` = 1 if Cabin is not null
+    - `Title`: Extracted from Name, grouped rare titles
+- **Encoding:**
+    - Sex: Binary (male=1, female=0)
+    - Embarked, Title: One-Hot Encoding
+- **Scaling:**
+    - StandardScaler applied to all features
 
 ---
 
 ### 📝 Next Steps
-
-#### Step 3: Data Preprocessing and Feature Engineering
-- [ ] 3.1: Handle Missing Values
-- [ ] 3.2: Feature Engineering
-- [ ] 3.3: Encode Categorical Variables
-- [ ] 3.4: Feature Scaling
-- [ ] 3.5: Create Final Feature Set
-- [ ] 3.6: Save Processed Data
 
 #### Step 4: Vertex AI Feature Store Setup
 - [ ] 4.1: Understanding Feature Store Concepts
@@ -118,62 +107,13 @@ gs://titanic-ml-data-titanic-ml-gcp/
 
 ## Technical Decisions & Notes
 
-### Authentication Approach
-- Using **Application Default Credentials (ADC)** for local development
-- No service account JSON keys (per organizational policy)
-- GCS operations work via `gcloud` CLI
-- Python SDK credential refresh needed for some operations (non-blocking)
-
-### Data Loading Strategy
-- Direct CSV loading from HuggingFace URLs (primary method)
-- Fallback to HuggingFace datasets library if needed
-- Handles missing target column in test set gracefully
-
 ### Architecture Patterns
-- Modular, reusable classes (`TitanicDataLoader`, `GCSManager`)
-- Configuration centralized in `src/config.py`
-- Comprehensive logging throughout
-- Type hints and docstrings for all public APIs
-- Error handling with graceful fallbacks
+- **Modular Preprocessing:** The `TitanicPreprocessor` class encapsulates all transformation logic. It follows the sklearn Transformer API (`fit`, `transform`), making it easy to integrate into pipelines or save/load as an artifact (`joblib`).
+- **Testing:** Added unit tests (`pytest`) to ensure preprocessing logic (imputation, engineering, encoding) works correctly before moving to modeling.
+- **Artifact Management:** Scalers and preprocessors are saved as artifacts to ensure training-serving skew is minimized (same logic applied at inference time).
 
 ---
 
-## Quick Reference Commands
-
-### Load Data
-```bash
-python scripts/01_load_and_save_data.py
-```
-
-### Test Data Loader
-```python
-from src.data.loader import TitanicDataLoader
-loader = TitanicDataLoader()
-train_df, test_df = loader.load_data()
-loader.display_info()
-```
-
-### GCS Operations (gcloud CLI)
-```bash
-# List bucket contents
-gcloud storage ls -r gs://titanic-ml-data-titanic-ml-gcp/
-
-# Upload file
-gcloud storage cp local_file.csv gs://titanic-ml-data-titanic-ml-gcp/path/
-
-# Download file
-gcloud storage cp gs://titanic-ml-data-titanic-ml-gcp/path/file.csv ./
-```
-
-### Configuration
-```python
-from src.config import config
-config.display_config()  # Show all settings
-```
-
----
-
-**Last Updated:** 2025-11-21  
-**Current Phase:** Phase 1 - Step 2 (partially complete)  
-**Next Milestone:** Complete data preprocessing (Step 3)
-
+**Last Updated:** 2025-11-21
+**Current Phase:** Phase 1 - Step 3 (Complete)
+**Next Milestone:** Vertex AI Feature Store Setup (Step 4)

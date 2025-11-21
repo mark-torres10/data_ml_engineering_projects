@@ -93,50 +93,50 @@
 ## Step 3: Data Preprocessing and Feature Engineering
 
 ### 3.1 Handle Missing Values
-- [ ] Impute missing Age values (median/mean by Pclass and Sex)
-- [ ] Create `Age_Missing` binary indicator feature
-- [ ] Extract cabin deck letter from Cabin column
-- [ ] Create `Has_Cabin` binary feature
-- [ ] Drop original Cabin column
-- [ ] Impute missing Embarked values with mode
-- [ ] Impute missing Fare values with median by Pclass
+- [x] Impute missing Age values (median/mean by Pclass and Sex)
+- [x] Create `Age_Missing` binary indicator feature
+- [x] Extract cabin deck letter from Cabin column
+- [x] Create `Has_Cabin` binary feature
+- [x] Drop original Cabin column
+- [x] Impute missing Embarked values with mode
+- [x] Impute missing Fare values with median by Pclass
 
 ### 3.2 Feature Engineering
-- [ ] Create `Family_Size` = SibSp + Parch + 1
-- [ ] Create `Is_Alone` binary feature
-- [ ] Extract titles from Name column (Mr., Mrs., Miss., Master., etc.)
-- [ ] Group rare titles into "Rare" category
-- [ ] Create fare bins (quartile-based)
-- [ ] Create age bins (Child, Young Adult, Adult, Senior)
-- [ ] Extract deck information from cabin
+- [x] Create `Family_Size` = SibSp + Parch + 1
+- [x] Create `Is_Alone` binary feature
+- [x] Extract titles from Name column (Mr., Mrs., Miss., Master., etc.)
+- [x] Group rare titles into "Rare" category
+- [x] Create fare bins (quartile-based)
+- [x] Create age bins (Child, Young Adult, Adult, Senior)
+- [x] Extract deck information from cabin
 
 ### 3.3 Encode Categorical Variables
-- [ ] Binary encoding for Sex (male=1, female=0)
-- [ ] One-hot encode Embarked (drop-first approach)
-- [ ] Ensure Pclass is integer type
-- [ ] One-hot encode Title
-- [ ] Label encode any remaining categorical features
+- [x] Binary encoding for Sex (male=1, female=0)
+- [x] One-hot encode Embarked (drop-first approach)
+- [x] Ensure Pclass is integer type
+- [x] One-hot encode Title
+- [x] Label encode any remaining categorical features
 
 ### 3.4 Feature Scaling
-- [ ] Initialize StandardScaler from scikit-learn
-- [ ] Fit scaler on training data only
-- [ ] Transform both train and test sets
-- [ ] Save scaler object using joblib
+- [x] Initialize StandardScaler from scikit-learn
+- [x] Fit scaler on training data only
+- [x] Transform both train and test sets
+- [x] Save scaler object using joblib
 
 ### 3.5 Create Final Feature Set
-- [ ] Select features for modeling (numerical, binary, one-hot encoded)
-- [ ] Drop unnecessary columns (PassengerId, Name, Ticket, original Cabin)
-- [ ] Create X_train and y_train
-- [ ] Verify no remaining null values
-- [ ] Verify all features are numeric
-- [ ] Confirm shapes match expectations
+- [x] Select features for modeling (numerical, binary, one-hot encoded)
+- [x] Drop unnecessary columns (PassengerId, Name, Ticket, original Cabin)
+- [x] Create X_train and y_train
+- [x] Verify no remaining null values
+- [x] Verify all features are numeric
+- [x] Confirm shapes match expectations
 
 ### 3.6 Save Processed Data
-- [ ] Save processed training data as CSV/pickle
-- [ ] Save test data similarly
-- [ ] Save scaler and encoder objects with joblib
-- [ ] Upload processed data to `gs://YOUR_BUCKET/data/processed/`
-- [ ] Verify uploads completed successfully
+- [x] Save processed training data as CSV/pickle
+- [x] Save test data similarly
+- [x] Save scaler and encoder objects with joblib
+- [x] Upload processed data to `gs://YOUR_BUCKET/data/processed/`
+- [x] Verify uploads completed successfully
 
 ---
 
