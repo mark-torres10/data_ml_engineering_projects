@@ -20,6 +20,16 @@ from sklearn.model_selection import train_test_split, cross_val_score, Stratifie
 from sklearn.metrics import roc_auc_score, accuracy_score
 
 from src.config import config
+
+# W&B imports - conditionally used based on config
+try:
+    import wandb
+    from wandb.integration.xgboost import WandbCallback
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    wandb = None
+    WandbCallback = None
 from src.models.model_config import XGBoostParams, TrainingConfig
 from src.models.model_utils import (
     ModelArtifactManager,
@@ -73,7 +83,54 @@ class XGBoostTrainer:
         # Training metrics
         self.training_metrics: Dict[str, Any] = {}
         
+        # W&B run tracking
+        self.wandb_run = None
+        self.use_wandb = config.USE_WANDB and WANDB_AVAILABLE
+        
+        if self.use_wandb and not WANDB_AVAILABLE:
+            logger.warning("W&B is enabled in config but wandb package is not installed. Disabling W&B.")
+            self.use_wandb = False
+        
         logger.info(f"Initialized XGBoostTrainer for job: {self.job_name}")
+        if self.use_wandb:
+            logger.info("W&B tracking enabled")
+    
+    def _init_wandb_run(self) -> None:
+        """Initialize Weights & Biases run for experiment tracking."""
+        if not self.use_wandb:
+            return
+        
+        try:
+            # Initialize W&B run
+            self.wandb_run = wandb.init(
+                project=config.WANDB_PROJECT,
+                entity=config.WANDB_ENTITY if config.WANDB_ENTITY else None,
+                name=self.job_name,
+                config={
+                    "model_type": "XGBoost",
+                    "model_params": self.model_params.to_dict(),
+                    "training_config": self.training_config.to_dict(),
+                    "gcp_project": config.GCP_PROJECT_ID,
+                    "gcp_region": config.GCP_REGION,
+                },
+                tags=["xgboost", "titanic", "training", "vertex-ai"],
+                reinit=True  # Allow multiple runs in same process
+            )
+            logger.info(f"W&B run initialized: {self.wandb_run.name} (ID: {self.wandb_run.id})")
+        except Exception as e:
+            logger.error(f"Failed to initialize W&B run: {e}")
+            self.use_wandb = False
+    
+    def _finish_wandb_run(self) -> None:
+        """Finish Weights & Biases run."""
+        if self.wandb_run is not None:
+            try:
+                wandb.finish()
+                logger.info("W&B run finished")
+            except Exception as e:
+                logger.error(f"Error finishing W&B run: {e}")
+            finally:
+                self.wandb_run = None
     
     def load_data_from_gcs(
         self,
@@ -242,6 +299,25 @@ class XGBoostTrainer:
         
         logger.info(f"CV {self.training_config.cv_scoring}: {cv_results['cv_mean']:.4f} (+/- {cv_results['cv_std']:.4f})")
         
+        # Log to W&B
+        if self.use_wandb and self.wandb_run is not None:
+            try:
+                wandb.log({
+                    "cv/mean_score": cv_results["cv_mean"],
+                    "cv/std_score": cv_results["cv_std"],
+                })
+                
+                # Log fold scores as histogram
+                wandb.log({"cv/fold_scores": wandb.Histogram(cv_results["cv_scores"])})
+                
+                # Log individual fold scores
+                for i, score in enumerate(cv_results["cv_scores"]):
+                    wandb.log({f"cv/fold_{i+1}_score": score})
+                
+                logger.info("Cross-validation results logged to W&B")
+            except Exception as e:
+                logger.error(f"Error logging CV results to W&B: {e}")
+        
         return cv_results
     
     def train(
@@ -282,10 +358,27 @@ class XGBoostTrainer:
         if X_val is not None and y_val is not None:
             eval_set.append((X_val, y_val))
         
+        # Prepare callbacks
+        callbacks = []
+        if self.use_wandb and self.wandb_run is not None and WandbCallback is not None:
+            try:
+                # Add W&B callback for automatic logging
+                callbacks.append(
+                    WandbCallback(
+                        log_model=True,  # Log model as artifact
+                        log_feature_importance=True,  # Log feature importance
+                        define_metric=True  # Define custom metrics
+                    )
+                )
+                logger.info("W&B callback added to training")
+            except Exception as e:
+                logger.error(f"Error adding W&B callback: {e}")
+        
         # Train model
         self.model.fit(
             X_train, y_train,
             eval_set=eval_set,
+            callbacks=callbacks if callbacks else None,
             verbose=self.training_config.verbose
         )
         
@@ -320,6 +413,29 @@ class XGBoostTrainer:
         if "val_accuracy" in self.training_metrics:
             logger.info(f"Val accuracy: {self.training_metrics['val_accuracy']:.4f}")
             logger.info(f"Val AUC: {self.training_metrics['val_auc']:.4f}")
+        
+        # Log final training metrics to W&B
+        if self.use_wandb and self.wandb_run is not None:
+            try:
+                wandb.log({
+                    "train/final_accuracy": self.training_metrics["train_accuracy"],
+                    "train/final_auc": self.training_metrics["train_auc"],
+                    "train/duration_seconds": self.training_metrics["training_time_seconds"],
+                    "train/n_estimators": self.training_metrics["n_estimators"],
+                })
+                
+                if self.training_metrics.get("best_iteration"):
+                    wandb.log({"train/best_iteration": self.training_metrics["best_iteration"]})
+                
+                if "val_accuracy" in self.training_metrics:
+                    wandb.log({
+                        "val/final_accuracy": self.training_metrics["val_accuracy"],
+                        "val/final_auc": self.training_metrics["val_auc"],
+                    })
+                
+                logger.info("Training metrics logged to W&B")
+            except Exception as e:
+                logger.error(f"Error logging training metrics to W&B: {e}")
         
         return self.model
     
@@ -405,37 +521,83 @@ class XGBoostTrainer:
         """
         logger.info(f"Starting training pipeline: {self.job_name}")
         
-        # Load data
-        train_df, test_df = self.load_data_from_gcs(train_path, test_path)
+        # Initialize W&B run
+        self._init_wandb_run()
         
-        # Prepare features and target
-        X, y = self.prepare_data(train_df, target_column)
+        try:
+            # Load data
+            train_df, test_df = self.load_data_from_gcs(train_path, test_path)
+            
+            # Log dataset info to W&B
+            if self.use_wandb and self.wandb_run is not None:
+                try:
+                    wandb.log({
+                        "data/train_samples": len(train_df),
+                        "data/train_features": len(train_df.columns),
+                    })
+                    if test_df is not None:
+                        wandb.log({
+                            "data/test_samples": len(test_df),
+                        })
+                except Exception as e:
+                    logger.error(f"Error logging data info to W&B: {e}")
+            
+            # Prepare features and target
+            X, y = self.prepare_data(train_df, target_column)
+            
+            # Log feature info to W&B
+            if self.use_wandb and self.wandb_run is not None:
+                try:
+                    wandb.log({
+                        "data/n_features": len(self.feature_names),
+                        "data/class_balance": float(y.mean()),
+                    })
+                except Exception as e:
+                    logger.error(f"Error logging feature info to W&B: {e}")
+            
+            # Perform cross-validation
+            cv_results = self.perform_cross_validation(X, y)
+            
+            # Split data
+            self.split_data(X, y)
+            
+            # Train model
+            self.train()
+            
+            # Save model
+            artifact_paths = self.save_model(output_dir, version, upload_to_gcs)
+            
+            # Compile results
+            results = {
+                "job_name": self.job_name,
+                "training_metrics": self.training_metrics,
+                "cv_results": cv_results,
+                "artifact_paths": artifact_paths,
+                "feature_names": self.feature_names,
+                "completed_at": datetime.now().isoformat()
+            }
+            
+            # Log summary to W&B
+            if self.use_wandb and self.wandb_run is not None:
+                try:
+                    wandb.summary.update({
+                        "final_train_accuracy": self.training_metrics.get("train_accuracy"),
+                        "final_train_auc": self.training_metrics.get("train_auc"),
+                        "final_val_accuracy": self.training_metrics.get("val_accuracy"),
+                        "final_val_auc": self.training_metrics.get("val_auc"),
+                        "cv_mean": cv_results.get("cv_mean") if cv_results else None,
+                        "training_time": self.training_metrics.get("training_time_seconds"),
+                    })
+                except Exception as e:
+                    logger.error(f"Error updating W&B summary: {e}")
+            
+            logger.info("Training pipeline completed successfully")
+            
+            return results
         
-        # Perform cross-validation
-        cv_results = self.perform_cross_validation(X, y)
-        
-        # Split data
-        self.split_data(X, y)
-        
-        # Train model
-        self.train()
-        
-        # Save model
-        artifact_paths = self.save_model(output_dir, version, upload_to_gcs)
-        
-        # Compile results
-        results = {
-            "job_name": self.job_name,
-            "training_metrics": self.training_metrics,
-            "cv_results": cv_results,
-            "artifact_paths": artifact_paths,
-            "feature_names": self.feature_names,
-            "completed_at": datetime.now().isoformat()
-        }
-        
-        logger.info("Training pipeline completed successfully")
-        
-        return results
+        finally:
+            # Always finish W&B run, even if pipeline fails
+            self._finish_wandb_run()
 
 
 def main():

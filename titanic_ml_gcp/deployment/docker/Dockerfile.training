@@ -14,6 +14,13 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# Weights & Biases configuration (can be overridden at runtime)
+ENV USE_WANDB=${USE_WANDB:-true} \
+    WANDB_PROJECT=${WANDB_PROJECT:-titanic-ml-gcp} \
+    WANDB_API_KEY=${WANDB_API_KEY:-} \
+    WANDB_DIR=/app/outputs/wandb \
+    WANDB_CACHE_DIR=/app/outputs/wandb_cache
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -42,7 +49,7 @@ COPY deployment/ /app/deployment/
 ENV PYTHONPATH=/app:${PYTHONPATH}
 
 # Create output directories
-RUN mkdir -p /app/outputs/models /app/outputs/evaluation
+RUN mkdir -p /app/outputs/models /app/outputs/evaluation /app/outputs/wandb /app/outputs/wandb_cache
 
 # Set up entrypoint
 ENTRYPOINT ["python", "-m", "src.models.trainer"]

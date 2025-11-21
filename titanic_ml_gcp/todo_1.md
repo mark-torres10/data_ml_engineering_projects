@@ -198,21 +198,23 @@
 - [ ] Decision made: Use Custom Training with XGBoost
 
 ### 5.2 Prepare Training Script
-- [ ] Create `src/models/trainer.py`
-- [ ] Implement data loading from GCS or Feature Store
-- [ ] Implement train/validation split (80/20)
-- [ ] Define XGBoost classifier parameters
-- [ ] Implement training with cross-validation
-- [ ] Implement evaluation on validation set
-- [ ] Implement model artifact saving to GCS
-- [ ] Add logging to Cloud Logging
+- [x] Create `src/models/trainer.py`
+- [x] Implement data loading from GCS or Feature Store
+- [x] Implement train/validation split (80/20)
+- [x] Define XGBoost classifier parameters
+- [x] Implement training with cross-validation
+- [x] Implement evaluation on validation set
+- [x] Implement model artifact saving to GCS
+- [x] Add logging to Cloud Logging
+- [x] Add W&B experiment tracking integration
 
 ### 5.3 Package Training Code
-- [ ] Create `deployment/docker/Dockerfile.training`
-- [ ] Choose base image (Vertex AI pre-built or python:3.12-slim)
-- [ ] Install dependencies using uv
-- [ ] Copy training script to container
-- [ ] Set entrypoint to run trainer.py
+- [x] Create `deployment/docker/Dockerfile.training`
+- [x] Choose base image (Vertex AI pre-built or python:3.12-slim)
+- [x] Install dependencies using uv
+- [x] Copy training script to container
+- [x] Set entrypoint to run trainer.py
+- [x] Add W&B environment variables and directories
 - [ ] Build Docker image locally
 - [ ] Test container locally with sample data
 - [ ] Create Artifact Registry repository
@@ -248,6 +250,29 @@
 - [ ] Create visualizations (ROC curve, confusion matrix)
 - [ ] Save evaluation results to JSON
 - [ ] Upload results to GCS
+
+### 5.7 Experiment Tracking with Weights & Biases
+- [x] Add wandb to dependencies (already present in pyproject.toml)
+- [x] Configure W&B environment variables in config.py
+- [x] Initialize W&B run in trainer
+- [x] Add WandbCallback to XGBoost training
+- [x] Log training metrics (accuracy, AUC, loss curves)
+- [x] Log cross-validation results
+- [x] Log dataset information (size, class balance)
+- [x] Create comprehensive W&B logging in evaluator
+- [x] Log evaluation metrics (accuracy, precision, recall, F1, AUC)
+- [x] Log confusion matrix (interactive W&B format)
+- [x] Log ROC curve (interactive W&B format)
+- [x] Log precision-recall curve (interactive W&B format)
+- [x] Log feature importance (table and chart)
+- [x] Log matplotlib figures as images
+- [x] Log prediction distribution histogram
+- [x] Update Docker configuration for W&B
+- [x] Add W&B directories to Docker image
+- [ ] Test W&B integration locally
+- [ ] Verify W&B dashboard shows all metrics and visualizations
+- [ ] Configure W&B API key in environment
+- [ ] Test W&B in Docker container
 
 ---
 

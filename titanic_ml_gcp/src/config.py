@@ -100,6 +100,12 @@ class Config:
     TRAINING_REPLICA_COUNT = int(os.getenv("TRAINING_REPLICA_COUNT", "1"))
     USE_GPU_TRAINING = os.getenv("USE_GPU_TRAINING", "False").lower() in ("true", "1", "yes")
     
+    # Weights & Biases Configuration
+    USE_WANDB = os.getenv("USE_WANDB", "true").lower() in ("true", "1", "yes")
+    WANDB_PROJECT = os.getenv("WANDB_PROJECT", "titanic-ml-gcp")
+    WANDB_ENTITY = os.getenv("WANDB_ENTITY", "")  # Optional: W&B username or team name
+    WANDB_API_KEY = os.getenv("WANDB_API_KEY", "")  # For authentication in containers
+    
     # Application Settings
     DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -118,6 +124,8 @@ class Config:
         print(f"Model Name:          {cls.MODEL_NAME}")
         print(f"Model Version:       {cls.MODEL_VERSION}")
         print(f"Endpoint Name:       {cls.ENDPOINT_NAME}")
+        print(f"W&B Enabled:         {cls.USE_WANDB}")
+        print(f"W&B Project:         {cls.WANDB_PROJECT}")
         print(f"Debug Mode:          {cls.DEBUG}")
         print("="*60 + "\n")
 

@@ -32,7 +32,16 @@ from sklearn.metrics import (
     average_precision_score
 )
 
+from src.config import config
 from src.models.model_config import EvaluationConfig
+
+# W&B imports - conditionally used based on config
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    wandb = None
 from src.models.model_utils import (
     ModelArtifactManager,
     load_training_artifacts,
@@ -436,12 +445,168 @@ class ModelEvaluator:
         
         return report
     
+    def log_to_wandb(
+        self,
+        y_true: pd.Series,
+        y_pred: Optional[np.ndarray] = None,
+        y_pred_proba: Optional[np.ndarray] = None,
+        feature_names: Optional[List[str]] = None,
+        prefix: str = "eval"
+    ) -> None:
+        """
+        Log all evaluation metrics and visualizations to Weights & Biases.
+        
+        Args:
+            y_true: True labels
+            y_pred: Predicted labels
+            y_pred_proba: Prediction probabilities
+            feature_names: List of feature names
+            prefix: Prefix for metric names
+        """
+        if not config.USE_WANDB or not WANDB_AVAILABLE:
+            return
+        
+        if wandb.run is None:
+            logger.warning("No active W&B run. Skipping W&B logging.")
+            return
+        
+        y_pred = y_pred if y_pred is not None else self.predictions
+        y_pred_proba = y_pred_proba if y_pred_proba is not None else self.prediction_probas
+        
+        if y_pred is None:
+            logger.warning("No predictions available for W&B logging")
+            return
+        
+        try:
+            logger.info("Logging evaluation results to W&B...")
+            
+            # Log basic metrics
+            if self.metrics:
+                wandb_metrics = {f"{prefix}/{k}": v for k, v in self.metrics.items()}
+                wandb.log(wandb_metrics)
+                logger.info(f"Logged {len(wandb_metrics)} metrics to W&B")
+            
+            # Log confusion matrix (W&B native format)
+            if y_pred is not None:
+                try:
+                    wandb.log({
+                        f"{prefix}/confusion_matrix_wandb": wandb.plot.confusion_matrix(
+                            probs=None,
+                            y_true=y_true.values,
+                            preds=y_pred,
+                            class_names=["Not Survived", "Survived"]
+                        )
+                    })
+                    logger.info("Logged confusion matrix to W&B")
+                except Exception as e:
+                    logger.error(f"Error logging confusion matrix to W&B: {e}")
+            
+            # Log ROC curve (W&B native format)
+            if y_pred_proba is not None:
+                try:
+                    # W&B expects probabilities for each class
+                    probs_both_classes = np.column_stack([1 - y_pred_proba, y_pred_proba])
+                    
+                    wandb.log({
+                        f"{prefix}/roc_curve_wandb": wandb.plot.roc_curve(
+                            y_true.values,
+                            probs_both_classes,
+                            labels=["Not Survived", "Survived"]
+                        )
+                    })
+                    logger.info("Logged ROC curve to W&B")
+                except Exception as e:
+                    logger.error(f"Error logging ROC curve to W&B: {e}")
+                
+                # Log PR curve (W&B native format)
+                try:
+                    wandb.log({
+                        f"{prefix}/pr_curve_wandb": wandb.plot.pr_curve(
+                            y_true.values,
+                            probs_both_classes,
+                            labels=["Not Survived", "Survived"]
+                        )
+                    })
+                    logger.info("Logged PR curve to W&B")
+                except Exception as e:
+                    logger.error(f"Error logging PR curve to W&B: {e}")
+            
+            # Log feature importance
+            if feature_names and self.model:
+                try:
+                    importance_df = get_feature_importance(self.model, feature_names)
+                    
+                    # Log as table
+                    wandb.log({
+                        f"{prefix}/feature_importance_table": wandb.Table(dataframe=importance_df)
+                    })
+                    
+                    # Log as bar chart
+                    data = [[label, val] for (label, val) in 
+                            zip(importance_df['feature'].tolist(), 
+                                importance_df['importance'].tolist())]
+                    table = wandb.Table(data=data, columns=["feature", "importance"])
+                    wandb.log({
+                        f"{prefix}/feature_importance_chart": wandb.plot.bar(
+                            table, "feature", "importance",
+                            title="Feature Importance"
+                        )
+                    })
+                    logger.info("Logged feature importance to W&B")
+                except Exception as e:
+                    logger.error(f"Error logging feature importance to W&B: {e}")
+            
+            # Log matplotlib figures as images
+            try:
+                # Confusion matrix image
+                cm_fig = self.plot_confusion_matrix(y_true, y_pred)
+                wandb.log({f"{prefix}/confusion_matrix_img": wandb.Image(cm_fig)})
+                plt.close(cm_fig)
+                
+                if y_pred_proba is not None:
+                    # ROC curve image
+                    roc_fig = self.plot_roc_curve(y_true, y_pred_proba)
+                    wandb.log({f"{prefix}/roc_curve_img": wandb.Image(roc_fig)})
+                    plt.close(roc_fig)
+                    
+                    # PR curve image
+                    pr_fig = self.plot_precision_recall_curve(y_true, y_pred_proba)
+                    wandb.log({f"{prefix}/pr_curve_img": wandb.Image(pr_fig)})
+                    plt.close(pr_fig)
+                
+                # Feature importance image
+                if feature_names and self.model:
+                    fi_fig = self.plot_feature_importance(feature_names)
+                    wandb.log({f"{prefix}/feature_importance_img": wandb.Image(fi_fig)})
+                    plt.close(fi_fig)
+                
+                logger.info("Logged matplotlib figures to W&B")
+            except Exception as e:
+                logger.error(f"Error logging matplotlib figures to W&B: {e}")
+            
+            # Log prediction distribution
+            try:
+                if y_pred_proba is not None:
+                    wandb.log({
+                        f"{prefix}/prediction_distribution": wandb.Histogram(y_pred_proba)
+                    })
+                    logger.info("Logged prediction distribution to W&B")
+            except Exception as e:
+                logger.error(f"Error logging prediction distribution to W&B: {e}")
+            
+            logger.info("W&B logging completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Error in W&B logging: {e}")
+    
     def evaluate(
         self,
         X: pd.DataFrame,
         y: pd.Series,
         feature_names: Optional[List[str]] = None,
-        output_dir: Optional[Path] = None
+        output_dir: Optional[Path] = None,
+        log_to_wandb: bool = True,
+        wandb_prefix: str = "eval"
     ) -> Dict[str, Any]:
         """
         Perform complete evaluation on test data.
@@ -451,6 +616,8 @@ class ModelEvaluator:
             y: True labels
             feature_names: List of feature names
             output_dir: Directory to save outputs
+            log_to_wandb: Whether to log results to W&B
+            wandb_prefix: Prefix for W&B metric names
             
         Returns:
             Dictionary with all evaluation results
@@ -471,6 +638,10 @@ class ModelEvaluator:
         
         # Generate classification report
         report = self.generate_classification_report(y, y_pred)
+        
+        # Log to W&B if enabled
+        if log_to_wandb:
+            self.log_to_wandb(y, y_pred, y_pred_proba, feature_names, prefix=wandb_prefix)
         
         # Set up output directory
         if output_dir:
