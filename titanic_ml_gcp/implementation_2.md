@@ -184,6 +184,130 @@ This phase enhances your ML pipeline with interactive retraining capabilities, h
 - Integrates well with other GCP services
 - Supports large model files
 
+### 2.5 MLflow Security Considerations
+
+**Important:** MLflow has known security vulnerabilities that can be exploited if not properly configured. This section covers essential security practices for production and even learning environments.
+
+**Known Vulnerabilities:**
+
+**1. Unsafe Deserialization (CVE-2023-1177, CVE-2023-6831)**
+- MLflow uses pickle for model serialization by default
+- Pickle can execute arbitrary code during deserialization
+- Malicious models can compromise your system
+- **Risk Level:** Critical
+
+**2. Directory Traversal / Path Injection (CVE-2023-6977)**
+- Improper input validation can allow accessing arbitrary files
+- Attackers could read sensitive data or credentials
+- **Risk Level:** High
+
+**3. Remote Code Execution (RCE)**
+- Combination of vulnerabilities can lead to full system compromise
+- Affects MLflow Tracking Server and artifact storage
+- **Risk Level:** Critical
+
+**Security Best Practices:**
+
+**1. Pin MLflow to Specific Patched Versions**
+- Always specify exact MLflow version in requirements.txt
+- Current recommendation: MLflow >= 2.9.2 (includes security patches)
+- Monitor MLflow security advisories: https://github.com/mlflow/mlflow/security/advisories
+- Update regularly but test before deploying to production
+- In requirements.txt: Use `mlflow==2.9.2` not `mlflow>=2.7.0`
+
+**2. Use Trusted, Verified Artifacts Only**
+- **Never load models from untrusted sources**
+- Implement model artifact verification:
+  - Calculate SHA-256 hash of model files
+  - Store hashes in metadata
+  - Verify hash before loading model
+- Use signed artifacts for production deployments
+- Quarantine and scan new models before use
+
+**3. Implement MLflow Tracking Server Access Controls**
+- If running MLflow server, use authentication:
+  - Enable basic authentication (MLflow 2.0+)
+  - Use reverse proxy (nginx) with authentication
+  - Integrate with existing SSO/OAuth if available
+- Network isolation:
+  - Run MLflow server on private network
+  - Use VPN or Cloud Identity-Aware Proxy (IAP) for access
+  - Never expose MLflow UI to public internet without authentication
+- GCP-specific: Use Identity-Aware Proxy for Compute Engine VM running MLflow
+
+**4. Artifact Storage Security**
+- GCS bucket permissions:
+  - Use principle of least privilege
+  - Separate buckets for different environments (dev/staging/prod)
+  - Enable uniform bucket-level access
+  - Audit access logs regularly
+- Encryption:
+  - Enable encryption at rest (default in GCS)
+  - Use customer-managed encryption keys (CMEK) for sensitive data
+  - Enable encryption in transit (HTTPS only)
+
+**5. Environment Isolation**
+- Run untrusted model loading in isolated environments:
+  - Use separate virtual machines or containers
+  - Implement sandboxing (gVisor, Kata Containers)
+  - Limit network access from model loading environment
+- For this learning project:
+  - Since you're only loading models you trained yourself, risk is lower
+  - Still good practice to implement basic isolation
+
+**6. Model Scanning and Validation**
+- Before loading any model:
+  - Scan with antivirus/malware tools
+  - Validate model file structure
+  - Check for suspicious embedded code
+- Implement automated scanning in CI/CD pipeline
+- Tools to consider: ClamAV for basic scanning, custom validators for ML models
+
+**7. Audit Logging**
+- Enable Cloud Logging for all MLflow operations
+- Log model loading events with timestamps and users
+- Monitor for suspicious patterns:
+  - Unusual model downloads
+  - Failed authentication attempts
+  - Unexpected artifact access
+- Set up alerts for security events
+
+**8. Secure Model Loading Practices**
+- Avoid using `mlflow.pyfunc.load_model()` with untrusted sources
+- Consider using MLflow's `mlflow.sklearn` or framework-specific loaders when possible
+- Implement additional validation before model.predict():
+  - Input validation
+  - Rate limiting
+  - Resource limits (memory, CPU time)
+
+**For This Project:**
+
+**Minimum security requirements:**
+1. ✅ Pin MLflow to version 2.9.2 or later in requirements.txt
+2. ✅ Use GCS bucket with proper IAM permissions (least privilege)
+3. ✅ Enable Cloud Logging for audit trail
+4. ✅ Only load models you personally trained and verified
+5. ✅ Keep MLflow UI on localhost (not public) during development
+
+**Optional but recommended:**
+- Implement model hash verification in your training pipeline
+- Set up budget alerts to detect unusual activity (potential compromise)
+- Use separate GCP projects for experimentation vs production
+
+**Production requirements (beyond this learning project):**
+- Authentication on MLflow Tracking Server
+- Signed model artifacts
+- Automated security scanning in CI/CD
+- Network isolation with private GCP VPC
+- Regular security audits and penetration testing
+
+**Resources:**
+- MLflow Security: https://mlflow.org/docs/latest/auth/index.html
+- GCP Security Best Practices: https://cloud.google.com/security/best-practices
+- OWASP ML Security: https://owasp.org/www-project-machine-learning-security-top-10/
+
+**Important Note:** These vulnerabilities are actively being addressed by the MLflow team. Always check for the latest security advisories and updates. Security is an ongoing process, not a one-time setup.
+
 ---
 
 ## Step 3: Set Up Optuna

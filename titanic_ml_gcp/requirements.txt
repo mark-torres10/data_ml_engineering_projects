@@ -17,9 +17,10 @@ google-cloud-storage>=2.10.0,<3.0.0
 google-cloud-logging>=3.5.0,<4.0.0
 google-auth>=2.23.0,<3.0.0
 
-# MLflow
-mlflow>=2.7.0,<3.0.0
-mlflow-skinny>=2.7.0,<3.0.0
+# MLflow - Pinned to specific version for security (CVE-2023-1177, CVE-2023-6831, CVE-2023-6977)
+# See implementation_2.md Section 2.5 for security considerations
+mlflow==2.9.2
+mlflow-skinny==2.9.2
 
 # Optuna
 optuna>=3.3.0,<4.0.0

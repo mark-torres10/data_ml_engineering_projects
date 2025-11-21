@@ -595,9 +595,10 @@ Create `deployment/docker/Dockerfile.training`:
 - Confusion Matrix: Visualize true/false positives/negatives
 
 **Expected performance:**
-- Good Titanic models achieve 78-82% accuracy
+- Good Titanic models typically achieve 78-82% accuracy (this is a learning benchmark, not a production requirement)
 - AUC-ROC should be 0.85-0.90
 - If much worse, check for data leakage or preprocessing errors
+- Performance can vary based on feature engineering choices and hyperparameters
 
 **Save evaluation results:**
 - Save metrics to a JSON file
@@ -689,6 +690,7 @@ This script should:
 - Endpoints charge per node hour (~$0.50-1/hour)
 - Even with 0 traffic, minimum replica incurs charges
 - Delete endpoint when not actively using
+- **Note:** Actual costs vary based on model size, request volume, Feature Store ingestion patterns, and artifact storage. Monitor the GCP Billing dashboard regularly to track spending and set up budget alerts
 
 ### 6.4 Test the Endpoint
 
@@ -1132,6 +1134,62 @@ This script should:
 - Configurations are parameterized
 - Ready to extend with new features
 
+**Production readiness recommendations:**
+
+Before moving to Phase 2, consider adopting these production best practices early:
+
+**1. Secret Management (High Priority)**
+- **Current approach:** Service account JSON key in environment variable or file
+- **Production approach:** Use GCP Secret Manager for sensitive credentials
+- **Why:** Secret Manager provides versioning, audit logging, and access controls
+- **How to migrate:**
+  - Store service account key in Secret Manager
+  - Grant your application access via IAM
+  - Use Secret Manager API to retrieve credentials at runtime
+  - Never commit credentials to version control
+- **GCP Console:** Security > Secret Manager > Create Secret
+
+**2. Model Versioning Strategy (Recommended)**
+- **Current approach:** Simple version tags (v1, v2, v3)
+- **Production approach:** Implement semantic versioning (v1.0.0, v1.1.0, v1.2.0)
+- **Why:** Track breaking changes, feature additions, and patches systematically
+- **Versioning scheme:**
+  - MAJOR (v2.0.0): Breaking changes like feature set modifications
+  - MINOR (v1.1.0): New features added without breaking compatibility
+  - PATCH (v1.0.1): Bug fixes, retraining with same features/hyperparameters
+- **Metadata to track:** Git commit SHA, training date, feature list, hyperparameters
+- **Document each version:** Create CHANGELOG.md to track model evolution
+
+**3. Data Versioning (Nice-to-Have)**
+- **Problem:** Preprocessing pipelines change, data drifts over time
+- **Solution:** Version your data alongside models
+- **Tools to consider:**
+  - **DVC (Data Version Control):** Git-like versioning for data and models
+  - **GCS object versioning:** Built-in GCS feature for file history
+  - **Custom solution:** Hash datasets and store in metadata
+- **What to version:**
+  - Raw data snapshots
+  - Preprocessed training data
+  - Feature engineering scripts
+  - Train/validation/test splits
+- **Benefits:** Reproducible experiments, debugging data issues, compliance
+
+**4. Configuration Management**
+- Store all configurations in version control (except secrets)
+- Use separate config files for dev/staging/production
+- Consider using environment-specific config files (config.dev.yaml, config.prod.yaml)
+- Document all configuration parameters and their impact
+
+**5. Model Artifact Organization**
+- Create standardized directory structure in GCS:
+  - models/production/current/ - Currently deployed model
+  - models/production/archive/ - Previous production models
+  - models/experiments/ - Experimental models from Phase 2
+  - models/metadata/ - JSON files with model provenance
+- Include README or metadata.json with each model describing its purpose and performance
+
+These practices will pay dividends in Phase 2 when managing multiple experiment runs and model versions.
+
 ---
 
 ## Troubleshooting Common Issues
@@ -1206,6 +1264,34 @@ This script should:
 - Test endpoint with gcloud CLI first
 - Add required IAM roles to service account
 
+### Issue: Resource quota exceeded errors
+
+**Possible causes:**
+- GCP project has default quotas for compute instances, GPUs, and API requests
+- New/free tier accounts have lower limits
+- Shared educational projects may have restricted quotas
+- Vertex AI training jobs or endpoints can hit CPU/GPU quotas
+
+**Common quota errors:**
+- "Quota 'CPUS' exceeded" when creating training jobs
+- "Insufficient quota for NVIDIA_TESLA_T4" when requesting GPUs
+- "Vertex AI API quota exceeded" with high request volume
+
+**Solutions:**
+- Check current quotas: Navigate to IAM & Admin > Quotas in GCP Console
+- Filter by service (Compute Engine, Vertex AI) to see limits
+- Request quota increase: Click on quota and "Edit Quotas" (approval takes 1-2 business days)
+- Use smaller machine types or fewer resources if hitting limits
+- Start without GPUs for Titanic dataset (not needed for small data)
+- For learning purposes, consider using preemptible instances to reduce quota pressure
+- Monitor quota usage in GCP Console to avoid surprises
+
+**Typical quotas for new projects:**
+- CPUs per region: 24 (often sufficient for this project)
+- GPUs: 0 (must request explicitly)
+- Vertex AI endpoints: 10 (adequate)
+- If working in a shared educational org, check with administrator for quota policies
+
 ---
 
 ## Success Criteria for Phase 1
@@ -1215,7 +1301,7 @@ You have successfully completed Phase 1 when:
 ✅ GCP project is set up with all necessary APIs enabled
 ✅ Titanic dataset is loaded, preprocessed, and uploaded to GCS
 ✅ Feature Store is created and populated with features
-✅ XGBoost model is trained and achieves 78%+ accuracy
+✅ XGBoost model is trained and achieves ≥78% accuracy (typical good performance for learning purposes)
 ✅ Model is deployed to a Vertex AI endpoint
 ✅ Endpoint responds to prediction requests in <500ms
 ✅ Streamlit UI allows interactive predictions
