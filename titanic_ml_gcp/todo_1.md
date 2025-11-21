@@ -63,18 +63,18 @@
 - [x] Convert to pandas DataFrames
 
 ### 2.2 Exploratory Data Analysis (EDA)
-- [ ] Create `notebooks/01_eda.ipynb`
-- [ ] Display first few rows with head()
-- [ ] Check data types and null counts with info()
-- [ ] Get summary statistics with describe()
-- [ ] Check class balance of Survived column
-- [ ] Calculate percentage of missing values per column
-- [ ] Visualize missing data patterns with heatmap
-- [ ] Plot histograms for numerical features
-- [ ] Plot bar charts for categorical features
-- [ ] Analyze survival rate by each feature
-- [ ] Create correlation matrix for numerical features
-- [ ] Document key insights
+- [x] Create `notebooks/01_eda.ipynb`
+- [x] Display first few rows with head()
+- [x] Check data types and null counts with info()
+- [x] Get summary statistics with describe()
+- [x] Check class balance of Survived column
+- [x] Calculate percentage of missing values per column
+- [x] Visualize missing data patterns with heatmap
+- [x] Plot histograms for numerical features
+- [x] Plot bar charts for categorical features
+- [x] Analyze survival rate by each feature
+- [x] Create correlation matrix for numerical features
+- [x] Document key insights
 
 ### 2.3 Create GCS Bucket
 - [x] Navigate to "Cloud Storage" > "Buckets"
