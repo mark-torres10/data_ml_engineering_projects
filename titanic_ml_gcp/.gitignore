@@ -85,6 +85,7 @@ checkpoints/
 mlruns/
 mlflow.db
 .mlflow/
+mlflow/
 
 # Optuna
 optuna.db
@@ -139,4 +140,3 @@ site/
 # Large files
 *.bin
 *.weights
-

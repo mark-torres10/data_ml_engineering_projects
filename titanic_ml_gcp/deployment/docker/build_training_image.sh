@@ -38,6 +38,7 @@ cd "${PROJECT_ROOT}"
 echo ""
 echo "Building Docker image..."
 docker build \
+    --platform linux/amd64 \
     -f deployment/docker/Dockerfile.training \
     -t "${IMAGE_NAME}:${IMAGE_TAG}" \
     -t "${IMAGE_URI}" \

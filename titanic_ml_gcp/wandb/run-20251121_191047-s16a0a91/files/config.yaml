@@ -1,0 +1,31 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        e:
+            p3x0zvafvvj1kw2g2e25vvxoyyd04f9p:
+                email: markptorres1@gmail.com
+                executable: /Users/mark/anaconda3/bin/python
+                git:
+                    commit: a0a8e06299a1b27bc3d194179c9acfaae107c7d3
+                    remote: https://github.com/mark-torres10/data_ml_engineering_projects.git
+                host: Marks-MacBook-Pro-4.local
+                os: macOS-14.1-arm64-arm-64bit
+                program: <stdin>
+                python: CPython 3.11.5
+                root: /Users/mark/Documents/projects/data_ml_engineering_projects/titanic_ml_gcp
+                startedAt: "2025-11-22T01:10:47.744853Z"
+                writerId: p3x0zvafvvj1kw2g2e25vvxoyyd04f9p
+        m: []
+        python_version: 3.11.5
+        t:
+            "1":
+                - 105
+            "2":
+                - 105
+            "3":
+                - 2
+                - 13
+            "4": 3.11.5
+            "5": 0.23.0
+            "12": 0.23.0
+            "13": darwin-arm64

@@ -1,0 +1,227 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        e:
+            04mygya8w2a7ga6cg3htzknk0o6zbbr3:
+                apple:
+                    ecpuCores: 6
+                    gpuCores: 18
+                    memoryGb: 36
+                    name: Apple M3 Pro
+                    pcpuCores: 6
+                    ramTotalBytes: "38654705664"
+                    swapTotalBytes: "36507222016"
+                args:
+                    - --train-path
+                    - gs://titanic-ml-data-titanic-ml-gcp/data/processed/train_processed.csv
+                    - --test-path
+                    - gs://titanic-ml-data-titanic-ml-gcp/data/processed/test_processed.csv
+                    - --output-dir
+                    - outputs/models_local
+                    - --version
+                    - v1
+                cpu_count: 12
+                cpu_count_logical: 12
+                disk:
+                    /:
+                        total: "494384795648"
+                        used: "414113177600"
+                email: markptorres1@gmail.com
+                executable: /Users/mark/Documents/projects/data_ml_engineering_projects/titanic_ml_gcp/.venv/bin/python3
+                git:
+                    commit: a0a8e06299a1b27bc3d194179c9acfaae107c7d3
+                    remote: https://github.com/mark-torres10/data_ml_engineering_projects.git
+                host: Marks-MacBook-Pro-4.local
+                memory:
+                    total: "38654705664"
+                os: macOS-14.1-arm64-arm-64bit
+                program: -m src.models.trainer
+                python: CPython 3.12.11
+                root: /Users/mark/Documents/projects/data_ml_engineering_projects/titanic_ml_gcp
+                startedAt: "2025-11-22T01:21:46.410286Z"
+                writerId: 04mygya8w2a7ga6cg3htzknk0o6zbbr3
+        m:
+            - "1": validation_0-auc
+              "6":
+                - 3
+              "7":
+                - 2
+            - "1": validation_1-auc
+              "6":
+                - 3
+              "7":
+                - 2
+        python_version: 3.12.11
+        t:
+            "1":
+                - 5
+                - 6
+                - 53
+            "2":
+                - 5
+                - 6
+                - 53
+            "3":
+                - 2
+                - 7
+                - 13
+                - 15
+                - 16
+                - 31
+                - 62
+                - 63
+            "4": 3.12.11
+            "5": 0.23.0
+            "10":
+                - 20
+            "12": 0.23.0
+            "13": darwin-arm64
+        visualize:
+            Feature Importance:
+                panel_config:
+                    fieldSettings:
+                        label: Feature
+                        value: Importance
+                    panelDefId: wandb/bar/v0
+                    stringSettings:
+                        title: Feature Importance
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: Feature Importance_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+gcp_project:
+    value: titanic-ml-gcp
+gcp_region:
+    value: us-central1
+learner:
+    value:
+        generic_param:
+            device: cpu
+            fail_on_invalid_gpu_id: "0"
+            n_jobs: "-1"
+            nthread: "-1"
+            random_state: "42"
+            seed: "42"
+            seed_per_iteration: "0"
+            validate_parameters: "1"
+        gradient_booster:
+            gbtree_model_param:
+                num_parallel_tree: "1"
+                num_trees: "0"
+            gbtree_train_param:
+                process_type: default
+                tree_method: hist
+                updater: grow_quantile_histmaker
+                updater_seq: grow_quantile_histmaker
+            name: gbtree
+            specified_updater: false
+            tree_train_param:
+                alpha: "0"
+                cache_opt: "1"
+                colsample_bylevel: "1"
+                colsample_bynode: "1"
+                colsample_bytree: "0.800000012"
+                eta: "0.100000001"
+                gamma: "0"
+                grow_policy: depthwise
+                interaction_constraints: ""
+                lambda: "1"
+                learning_rate: "0.100000001"
+                max_bin: "256"
+                max_cat_threshold: "64"
+                max_cat_to_onehot: "4"
+                max_delta_step: "0"
+                max_depth: "5"
+                max_leaves: "0"
+                min_child_weight: "1"
+                min_split_loss: "0"
+                monotone_constraints: ()
+                refresh_leaf: "1"
+                reg_alpha: "0"
+                reg_lambda: "1"
+                sampling_method: uniform
+                sketch_ratio: "2"
+                sparse_threshold: "0.20000000000000001"
+                subsample: "0.800000012"
+            updater:
+                - hist_train_param:
+                    debug_synchronize: "0"
+                    max_cached_hist_node: "65536"
+                  name: grow_quantile_histmaker
+        learner_model_param:
+            base_score: "5E-1"
+            boost_from_average: "1"
+            num_class: "0"
+            num_feature: "14"
+            num_target: "1"
+        learner_train_param:
+            booster: gbtree
+            disable_default_eval_metric: "0"
+            multi_strategy: one_output_per_tree
+            objective: binary:logistic
+        metrics:
+            - name: auc
+        objective:
+            name: binary:logistic
+            reg_loss_param:
+                scale_pos_weight: "1"
+model_params:
+    value:
+        colsample_bytree: 0.8
+        early_stopping_rounds: 10
+        eval_metric: auc
+        gamma: 0
+        learning_rate: 0.1
+        max_depth: 5
+        min_child_weight: 1
+        n_estimators: 100
+        n_jobs: -1
+        objective: binary:logistic
+        random_state: 42
+        reg_alpha: 0
+        reg_lambda: 1
+        subsample: 0.8
+        tree_method: hist
+model_type:
+    value: XGBoost
+training_config:
+    value:
+        cv_folds: 5
+        cv_scoring: roc_auc
+        data_source: gcs
+        feature_selection: false
+        gcs_test_path: null
+        gcs_train_path: null
+        log_interval: 10
+        max_features: null
+        model_name: xgboost_model
+        output_dir: outputs/models
+        random_state: 42
+        save_format: json
+        stratify: true
+        test_split: 0
+        use_cross_validation: true
+        validation_split: 0.2
+        verbose: true
+version:
+    value:
+        - 2
+        - 1
+        - 4
