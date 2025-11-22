@@ -106,8 +106,8 @@ This document summarizes the implementation of **Step 5: Model Training with XGB
 **Usage**:
 ```bash
 python scripts/04_train_model_local.py \
-    --train-path gs://bucket/data/train.csv \
-    --test-path gs://bucket/data/test.csv \
+    --train-path gs://bucket/data/processed/train_processed.csv \
+    --test-path gs://bucket/data/processed/test_processed.csv \
     --version v1 \
     --upload-to-gcs
 ```
@@ -230,7 +230,7 @@ training_config = TrainingConfig(
 # Train
 trainer = XGBoostTrainer(model_params, training_config)
 results = trainer.run_training_pipeline(
-    train_path="gs://bucket/data/train.csv",
+    train_path="gs://bucket/data/processed/train_processed.csv",
     version="v1"
 )
 
@@ -267,7 +267,7 @@ cd deployment/docker
 
 # Run locally
 docker run xgboost-training:latest \
-    --train-path gs://bucket/data/train.csv \
+    --train-path gs://bucket/data/processed/train_processed.csv \
     --output-dir outputs/models \
     --version v1
 ```
@@ -278,7 +278,7 @@ docker run xgboost-training:latest \
 # Submit job
 python scripts/04_submit_training_job.py \
     --job-name "xgboost-training-v1" \
-    --train-path gs://bucket/data/processed/train.csv \
+    --train-path gs://bucket/data/processed/train_processed.csv \
     --version v1 \
     --machine-type n1-standard-4
 
@@ -310,8 +310,8 @@ dependencies = [
 1. **Test Local Training**:
 ```bash
 python scripts/04_train_model_local.py \
-    --train-path gs://YOUR_BUCKET/data/processed/train.csv \
-    --test-path gs://YOUR_BUCKET/data/processed/test.csv \
+    --train-path gs://YOUR_BUCKET/data/processed/train_processed.csv \
+    --test-path gs://YOUR_BUCKET/data/processed/test_processed.csv \
     --version v1_test
 ```
 
@@ -332,8 +332,8 @@ gcloud artifacts repositories create titanic-ml-repo \
 4. **Submit Training Job to Vertex AI**:
 ```bash
 python scripts/04_submit_training_job.py \
-    --train-path gs://YOUR_BUCKET/data/processed/train.csv \
-    --test-path gs://YOUR_BUCKET/data/processed/test.csv \
+    --train-path gs://YOUR_BUCKET/data/processed/train_processed.csv \
+    --test-path gs://YOUR_BUCKET/data/processed/test_processed.csv \
     --version v1
 ```
 

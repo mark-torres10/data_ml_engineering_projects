@@ -467,6 +467,13 @@ For each feature in your processed dataset, register it with the Feature Store:
 
 ## Step 5: Model Training with XGBoost
 
+> **Note: Issues with Docker and Vertex AI Custom Training**
+> We encountered significant issues with building the Docker container (architecture mismatch on Apple Silicon) and submitting the Vertex AI custom job (exec format errors and import errors in the cloud environment). 
+>
+> As a result, **Step 5.3 and 5.4 are currently paused/skipped.** We will proceed by focusing on **local training** (Step 5.2 and local execution of Step 5.5/5.6) to move the project forward. 
+>
+> The instructions below for Docker and Vertex AI are kept for reference or future debugging, but the primary workflow for Phase 1 will be local training using `scripts/04_train_model_local.py`.
+
 ### 5.1 Choose Training Approach
 
 **Two options for Vertex AI training:**

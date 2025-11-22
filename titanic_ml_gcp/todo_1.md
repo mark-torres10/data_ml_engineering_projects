@@ -194,6 +194,8 @@
 
 ## Step 5: Model Training with XGBoost
 
+_Implementation note: use `scripts/04_train_model_local.py` for local runs and `scripts/04_submit_training_job.py` (or the JSON config) for Vertex AI custom training, with preprocessed data at `gs://YOUR_BUCKET/data/processed/train_processed.csv` and `test_processed.csv` as detailed in `TRAINING_QUICKSTART.md` and `STEP_5_IMPLEMENTATION_SUMMARY.md`._
+
 ### 5.1 Choose Training Approach
 - [x] Decision made: Use Custom Training with XGBoost
 
@@ -269,9 +271,9 @@
 - [x] Log prediction distribution histogram
 - [x] Update Docker configuration for W&B
 - [x] Add W&B directories to Docker image
-- [ ] Test W&B integration locally
-- [ ] Verify W&B dashboard shows all metrics and visualizations
-- [ ] Configure W&B API key in environment
+- [x] Test W&B integration locally
+- [x] Verify W&B dashboard shows all metrics and visualizations
+- [x] Configure W&B API key in environment
 - [ ] Test W&B in Docker container
 
 ---

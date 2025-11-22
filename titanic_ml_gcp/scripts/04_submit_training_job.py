@@ -113,15 +113,14 @@ def submit_training_job(
         job_name = f"xgboost_training_{timestamp}"
     
     if container_image_uri is None:
-        # Use default image URI format
-        container_image_uri = (
-            f"{config.GCP_REGION}-docker.pkg.dev/"
-            f"{config.GCP_PROJECT_ID}/titanic-ml-repo/"
-            f"xgboost-training:latest"
-        )
+        # Use default training image URI from central config
+        container_image_uri = config.TRAINING_IMAGE_URI
     
+    # Default to the preprocessed training data created in Step 3.6
+    # See scripts/02_preprocess_data.py which writes `train_processed.csv`
+    # and uploads it to `data/processed/train_processed.csv` in GCS.
     if train_data_path is None:
-        train_data_path = f"{config.GCS_DATA_URI}/processed/train.csv"
+        train_data_path = f"{config.GCS_DATA_URI}/processed/train_processed.csv"
     
     if output_dir is None:
         output_dir = f"{config.GCS_MODEL_URI}/{model_version or 'latest'}"
@@ -170,19 +169,36 @@ def submit_training_job(
         container_uri=container_image_uri,
     )
     
+    # Define environment variables for the container
+    # Explicitly disable W&B for Vertex AI execution to prevent auth errors
+    env_vars = {
+        "USE_WANDB": "false",
+        "WANDB_API_KEY": config.WANDB_API_KEY or "",
+        "WANDB_PROJECT": config.WANDB_PROJECT,
+        "GCP_PROJECT_ID": config.GCP_PROJECT_ID,
+        "GCP_REGION": config.GCP_REGION,
+    }
+    
+    logger.info(f"Environment variables: {env_vars}")
+
     # Run the training job
     logger.info("Starting training job execution...")
     
-    job.run(
-        args=container_args,
-        replica_count=replica_count,
-        machine_type=machine_type,
-        accelerator_type=accelerator_type,
-        accelerator_count=accelerator_count,
-        base_output_dir=output_dir,
-        service_account=service_account,
-        sync=wait_for_completion
-    )
+    run_kwargs = {
+        "args": container_args,
+        "environment_variables": env_vars,
+        "replica_count": replica_count,
+        "machine_type": machine_type,
+        "base_output_dir": output_dir,
+        "service_account": service_account,
+        "sync": wait_for_completion,
+    }
+    
+    if accelerator_type:
+        run_kwargs["accelerator_type"] = accelerator_type
+        run_kwargs["accelerator_count"] = accelerator_count
+    
+    job.run(**run_kwargs)
     
     if wait_for_completion:
         logger.info("✓ Training job completed successfully")
