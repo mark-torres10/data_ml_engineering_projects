@@ -52,3 +52,4 @@ streamlit run src/app/streamlit_app.py
 - View registered models (local registry).
 - (Future) Load model and predict on new data.
 
+

@@ -42,17 +42,18 @@ def titanic_objective(trial, X_train, y_train, X_val, y_val):
     
     # Pruning callback
     # Note: validation_0 is the default name for the first eval_set
-    pruning_callback = optuna.integration.XGBoostPruningCallback(trial, "validation_0-auc")
+    # pruning_callback = optuna.integration.XGBoostPruningCallback(trial, "validation_0-auc")
     
     model = xgb.XGBClassifier(**params)
     
     # Fit model
+    # Removing callbacks for now to resolve compatibility issues with XGBClassifier wrapper
     model.fit(
         X_train, 
         y_train,
         eval_set=[(X_val, y_val)],
-        verbose=False,
-        callbacks=[pruning_callback]
+        verbose=False
+        # callbacks=[pruning_callback] 
     )
     
     # Predict

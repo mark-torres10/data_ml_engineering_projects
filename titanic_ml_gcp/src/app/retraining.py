@@ -129,13 +129,17 @@ def run_retraining(
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=5),
     )
     
-    # Callback for MLflow logging
-    # Nest trials under the parent run
-    mlflow_callback = MLflowCallback(
-        tracking_uri=mlflow_manager.tracking_uri,
-        metric_name="auc",
-        nest_trials=True
-    )
+    # Custom Callback to handle nesting manually
+    class CustomMLflowCallback:
+        def __init__(self):
+            pass
+            
+        def __call__(self, study, trial):
+            with mlflow.start_run(nested=True, run_name=f"trial_{trial.number}"):
+                mlflow.log_params(trial.params)
+                mlflow.log_metric("auc", trial.value)
+                
+    mlflow_callback = CustomMLflowCallback()
     
     logger.info(f"Running Optuna optimization for {n_trials} trials...")
     
