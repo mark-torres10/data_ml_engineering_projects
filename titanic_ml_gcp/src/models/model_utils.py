@@ -14,10 +14,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
-import pandas as pd
+
 import numpy as np
-from xgboost import XGBClassifier
+import pandas as pd
 from google.cloud import storage
+from google.auth.exceptions import DefaultCredentialsError
+from xgboost import XGBClassifier
 
 from src.config import config
 
@@ -36,8 +38,27 @@ class ModelArtifactManager:
             bucket_name: GCS bucket name. If None, uses config.GCS_BUCKET_NAME
         """
         self.bucket_name = bucket_name or config.GCS_BUCKET_NAME
-        self.storage_client = storage.Client(project=config.GCP_PROJECT_ID)
-        self.bucket = self.storage_client.bucket(self.bucket_name)
+
+        # Attempt to initialize GCS client; fall back gracefully if ADC is missing
+        try:
+            self.storage_client = storage.Client(project=config.GCP_PROJECT_ID)
+            self.bucket = self.storage_client.bucket(self.bucket_name)
+        except DefaultCredentialsError as e:
+            logger.warning(
+                "Could not initialize GCS client due to missing credentials: %s. "
+                "ModelArtifactManager will operate in local-only mode.",
+                e,
+            )
+            self.storage_client = None
+            self.bucket = None
+        except Exception as e:
+            logger.warning(
+                "Unexpected error initializing GCS client: %s. "
+                "ModelArtifactManager will operate in local-only mode.",
+                e,
+            )
+            self.storage_client = None
+            self.bucket = None
         
     def save_model_local(
         self,
@@ -383,33 +404,34 @@ def setup_cloud_logging(
     """
     try:
         from google.cloud import logging as cloud_logging
-        
+
         # Create Cloud Logging client
         logging_client = cloud_logging.Client(project=config.GCP_PROJECT_ID)
-        
+
         # Set up Cloud Logging handler
         handler = cloud_logging.handlers.CloudLoggingHandler(
             logging_client,
-            name=job_name
+            name=job_name,
         )
-        
+
         # Configure root logger
-        logger = logging.getLogger()
-        logger.setLevel(getattr(logging, log_level.upper()))
-        logger.addHandler(handler)
-        
+        root_logger = logging.getLogger()
+        root_logger.setLevel(getattr(logging, log_level.upper()))
+        root_logger.addHandler(handler)
+
         logger.info(f"Cloud Logging configured for job: {job_name}")
-        
+
     except Exception as e:
+        # Use module-level logger for warnings
         logger.warning(f"Could not set up Cloud Logging: {e}")
         logger.info("Using console logging instead")
-        
+
         # Fall back to console logging
         logging.basicConfig(
             level=getattr(logging, log_level.upper()),
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-        logger = logging.getLogger()
-    
-    return logger
+        root_logger = logging.getLogger()
+
+    return root_logger
 

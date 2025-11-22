@@ -101,6 +101,16 @@ class XGBoostTrainer:
             return
         
         try:
+            # Explicit login if API key is provided (useful inside containers)
+            if config.WANDB_API_KEY:
+                try:
+                    wandb.login(key=config.WANDB_API_KEY)
+                    logger.info("Authenticated with W&B using provided API key")
+                except Exception as login_err:
+                    logger.error(f"Failed to authenticate with W&B: {login_err}")
+                    # Fail fast if we cannot authenticate with W&B
+                    raise
+            
             # Initialize W&B run
             self.wandb_run = wandb.init(
                 project=config.WANDB_PROJECT,
@@ -118,8 +128,9 @@ class XGBoostTrainer:
             )
             logger.info(f"W&B run initialized: {self.wandb_run.name} (ID: {self.wandb_run.id})")
         except Exception as e:
-            logger.error(f"Failed to initialize W&B run: {e}")
-            self.use_wandb = False
+            # Do not silently disable W&B; surface the error so the job fails loudly
+            logger.error(f"Failed to initialize W&B run, aborting training: {e}")
+            raise
     
     def _finish_wandb_run(self) -> None:
         """Finish Weights & Biases run."""
@@ -273,8 +284,12 @@ class XGBoostTrainer:
         
         logger.info(f"Performing {self.training_config.cv_folds}-fold cross-validation")
         
-        # Create XGBoost model
-        cv_model = XGBClassifier(**self.model_params.to_dict())
+        # Create XGBoost model for cross-validation.
+        # Early stopping requires an eval_set, which isn't used in cross_val_score,
+        # so we disable it here to avoid configuration errors.
+        cv_params = self.model_params.to_dict().copy()
+        cv_params.pop("early_stopping_rounds", None)
+        cv_model = XGBClassifier(**cv_params)
         
         # Stratified K-Fold
         cv = StratifiedKFold(
@@ -358,27 +373,26 @@ class XGBoostTrainer:
         if X_val is not None and y_val is not None:
             eval_set.append((X_val, y_val))
         
-        # Prepare callbacks
-        callbacks = []
+        # Configure callbacks on the model (XGBoost 2.x uses the `callbacks` attribute)
         if self.use_wandb and self.wandb_run is not None and WandbCallback is not None:
             try:
-                # Add W&B callback for automatic logging
-                callbacks.append(
-                    WandbCallback(
-                        log_model=True,  # Log model as artifact
-                        log_feature_importance=True,  # Log feature importance
-                        define_metric=True  # Define custom metrics
-                    )
+                self.model.set_params(
+                    callbacks=[
+                        WandbCallback(
+                            log_model=True,  # Log model as artifact
+                            log_feature_importance=True,  # Log feature importance
+                            define_metric=True,  # Define custom metrics
+                        )
+                    ]
                 )
-                logger.info("W&B callback added to training")
+                logger.info("W&B callback configured on XGBoost model")
             except Exception as e:
-                logger.error(f"Error adding W&B callback: {e}")
+                logger.error(f"Error configuring W&B callback on model: {e}")
         
         # Train model
         self.model.fit(
             X_train, y_train,
             eval_set=eval_set,
-            callbacks=callbacks if callbacks else None,
             verbose=self.training_config.verbose
         )
         

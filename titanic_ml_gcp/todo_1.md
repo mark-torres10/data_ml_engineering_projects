@@ -195,7 +195,7 @@
 ## Step 5: Model Training with XGBoost
 
 ### 5.1 Choose Training Approach
-- [ ] Decision made: Use Custom Training with XGBoost
+- [x] Decision made: Use Custom Training with XGBoost
 
 ### 5.2 Prepare Training Script
 - [x] Create `src/models/trainer.py`
@@ -215,12 +215,12 @@
 - [x] Copy training script to container
 - [x] Set entrypoint to run trainer.py
 - [x] Add W&B environment variables and directories
-- [ ] Build Docker image locally
-- [ ] Test container locally with sample data
-- [ ] Create Artifact Registry repository
-- [ ] Authenticate Docker with Artifact Registry
-- [ ] Tag image with registry path
-- [ ] Push image to Artifact Registry
+- [x] Build Docker image locally
+- [ ] Test container locally with sample data (will test on Vertex AI)
+- [x] Create Artifact Registry repository
+- [x] Authenticate Docker with Artifact Registry
+- [x] Tag image with registry path
+- [x] Push image to Artifact Registry
 
 ### 5.4 Create Vertex AI Training Job
 - [ ] Navigate to Vertex AI > Training

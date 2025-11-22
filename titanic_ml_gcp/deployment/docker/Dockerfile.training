@@ -32,14 +32,14 @@ RUN apt-get update && apt-get install -y \
 
 # Install uv for fast package installation
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Copy dependency files
 COPY requirements.txt /app/
 COPY pyproject.toml /app/
 
 # Install Python dependencies using uv
-RUN uv pip install --system -r requirements.txt
+RUN /root/.local/bin/uv pip install --system -r requirements.txt
 
 # Copy source code
 COPY src/ /app/src/

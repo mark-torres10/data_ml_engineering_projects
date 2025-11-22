@@ -8,7 +8,10 @@ including uploading, downloading, listing, and managing files.
 import logging
 from pathlib import Path
 from typing import List, Optional, Union
+
+import pandas as pd
 from google.cloud import storage
+
 from src.config import config
 
 logging.basicConfig(
@@ -318,6 +321,74 @@ def list_gcs_files(prefix: str = "") -> List[str]:
     """
     gcs = GCSManager()
     return gcs.list_files(prefix)
+
+
+def _parse_gcs_uri(gcs_uri: str) -> tuple[str, str]:
+    """
+    Parse a GCS URI into (bucket_name, blob_path).
+
+    If a bare path without gs:// is provided, the default project bucket
+    from config is used.
+    """
+    if gcs_uri.startswith("gs://"):
+        without_scheme = gcs_uri[5:]
+        bucket_name, _, blob_path = without_scheme.partition("/")
+        if not bucket_name or not blob_path:
+            raise ValueError(f"Invalid GCS URI: {gcs_uri}")
+        return bucket_name, blob_path
+
+    # Treat as path within the default bucket
+    return config.GCS_BUCKET_NAME, gcs_uri.lstrip("/")
+
+
+def load_dataframe_from_gcs(gcs_path: str, **read_csv_kwargs) -> pd.DataFrame:
+    """
+    Load a CSV file from GCS into a pandas DataFrame.
+
+    Args:
+        gcs_path: Full GCS URI (gs://bucket/path.csv) or bucket-relative path.
+        read_csv_kwargs: Additional keyword args passed to pandas.read_csv.
+
+    Returns:
+        pandas DataFrame with the loaded data.
+    """
+    bucket_name, blob_path = _parse_gcs_uri(gcs_path)
+    gcs = GCSManager(bucket_name=bucket_name)
+
+    tmp_dir = Path("/tmp/gcs_data")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    local_path = tmp_dir / Path(blob_path).name
+
+    gcs.download_file(blob_path, local_path)
+    df = pd.read_csv(local_path, **read_csv_kwargs)
+    logger.info(f"Loaded DataFrame from {gcs_path}: shape={df.shape}")
+    return df
+
+
+def upload_dataframe_to_gcs(df: pd.DataFrame, gcs_path: str, index: bool = False, **to_csv_kwargs) -> str:
+    """
+    Upload a pandas DataFrame to GCS as a CSV file.
+
+    Args:
+        df: DataFrame to upload.
+        gcs_path: Full GCS URI (gs://bucket/path.csv) or bucket-relative path.
+        index: Whether to include the index in the CSV.
+        to_csv_kwargs: Additional keyword args passed to DataFrame.to_csv.
+
+    Returns:
+        GCS URI where the DataFrame was uploaded.
+    """
+    bucket_name, blob_path = _parse_gcs_uri(gcs_path)
+    gcs = GCSManager(bucket_name=bucket_name)
+
+    tmp_dir = Path("/tmp/gcs_data")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    local_path = tmp_dir / Path(blob_path).name
+
+    df.to_csv(local_path, index=index, **to_csv_kwargs)
+    uri = gcs.upload_file(local_path, blob_path, content_type="text/csv")
+    logger.info(f"Uploaded DataFrame to {uri}")
+    return uri
 
 
 if __name__ == "__main__":
