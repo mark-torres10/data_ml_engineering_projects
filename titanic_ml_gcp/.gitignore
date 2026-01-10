@@ -61,6 +61,7 @@ ipython_config.py
 !deployment/kubernetes/*.json
 gcp-key.json
 service-account-key.json
+*-sa-key.json
 credentials.json
 application_default_credentials.json
 
