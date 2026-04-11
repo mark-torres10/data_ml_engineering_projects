@@ -40,6 +40,66 @@ At a high-level, we can imagine encoders vs. decoders as something like:
 
 When used together, encoders tell us "what does this input mean?", and then that representation of "understanding" is used by the decoder to tell us "given that meaning, what should we produce next?"
 
+### The original context for the encoder + decoder system
+
+The original transformer model was developed at Google specifically for the task of **machine translation**. In this problem, the model receives a complete source sentence and it must translate it to the next sentence.
+
+To translate a text requires doing the following:
+
+1. Understanding the input sentence.
+2. Translating the input sentence.
+
+You can't literally just translate word-for-word. Imagine, for example, the following two sentences:
+
+- "He went to the river bank to catch fish"
+- "He went to the bank to withdraw money"
+
+Here, you can't do a literal translation of the word "bank" independent of the other words in the sentence. You must understand the word "bank" in relation to the other words.
+
+We need to first understand the sentence and then make the translation based on the understanding. We need to understand what each word means *in context* to the other words in the sentence.
+
+This perfectly maps to the encoder/decoder setup:
+
+1. Our encoder understands the input sentence. It then passes its understanding to the decoder.
+2. Based on the encoder's understanding of the sentence, the decoder produces the translation.
+
+#### The different types of attention
+
+The encoder + decoder architecture splits this task into two parts, understanding and generation. The encoder has to analyze the entire sentence all at once and generate a "this is what the entire sentence means" representation of the sentence. Specifically, each token in the sentence is reweighted or transformed based on its meaning in the context of the whole sentence. This is called **self-attention**. In contrast, the decoder combines two forms of attention: **casual self-attention**, where the decoder looks at and understands what it's generated so far, and **cross-attention**, where the decoder then looks at the encoder's output and pulls what info it needs for additional context.
+
+To understand the different forms of attention and what the encoder and decoder do, let's use an overly simplified analogy:
+
+Let's say that we're working at a media tech startup as software engineers, and our customers want to create a "summarize the headlines" feature on their website, so that customers can always get an updated report of what's going on in the world that's relevant to them.
+
+- We have a product team that talks to the customer. They get the initial specs, feedback, requirements, and budget from the customers. They translate this into a synthesized understanding, based on their knowledge of the clients (e.g., "this requirement is actually not as important as this other requirement, or this other requirement wasn't emphasized enough but I know they'll actually care about it"). They may do this for a few rounds back-and-forth with the customer. They then hand this off to the engineering team.
+- The engineering team then takes this requirement and starts building, one day at a time. Let's say it's just one software engineer building features one day at a time. They base what they build by looking first at "what did I build the previous days?", get an understanding of what they think they need to work on today, and then peek at the product team's notes and specs are, and then refine their understanding. They might do this for a few rounds (look at their previous code, then look at the product specs, then look at the existing code again, a few times). Finally, they figure out "this is what I should do next", and build the next part of the code.
+
+In this analogy, the product team is like the encoder of the original transformer model. They get an "understanding" of what the original input was (here, the input being the client specs and requirements) and then give that translated understanding to the decoder.
+
+- They may take the client specs and update them by selectively incorporating parts of the other inputs as context (e.g. the client might say "I want to use the most powerful AI model", but they also said "we have a budget of XYZ", so you reinterpret the initial ask as "I want to use the most powerful AI model... that is within our budget"), This is like the **self-attention** mechanism of the encoder block. We transform the meaning of a single token (here, "I want to use the most powerful AI model") in the context of the entire sequence (e.g,. "we have a budget of XYZ") to create a transformed representation of the single token in context (e.g., "I want to use the most powerful AI model... that is within our budget").
+- Then based on this reweighting of the specs, the product team can add new requirements or reword certain requirements (e.g., if a bunch of customers pointed out that they were concerned about privacy, we can turn that initial requirement into a new requirement, like "make sure that we have multitenancy and encryption available"). This is like the feedforward neural network portion of the encoder block, where we reshuffle the reweighted features and create combinations of new features.
+- They may have to do this for a few rounds of iteration (the product team has the v1 draft of their understanding of the client specs, then they might revise it a few times), representing the `N` blocks that the encoder block may have. Once they're satisfied with this understanding, they pass this off to the engineering team.
+
+In this analogy, the engineering team is like the decoder of the original transformer model. They take (1) their existing codebase and (2) what specs they got from the product team and then make the feature come to life. Let's imagine what one engineer does on a given day.
+
+- First, the engineer looks at the code already written for the project. This represents the **causal self-attention** mechanism. The engineer looks at the already-generated code to understand where they are right now. In a decoder, a causal mask prevents the decoder from "looking ahead" into the future; in this analogy, an engineer cannot "look ahead" to code that doesn't literally exist yet.
+- Then, the engineer looks at the specs from the product team and refines their understanding of what they need to do today. This is **cross-attention**; the decoder queries the encoder's keys/values to get the additional context they need to do the generation task. In the same way, the engineer asks targeted questions ("queries") to the product specs to get more information based on what they're trying to build (e.g., the engineer may want to know "which libraries are we allowed to use?" and then check for this information in the product spec).
+- The engineer then takes what it learned from looking at what's been generated and what the client specs are and then synthesizes that information to create their own understanding of what it needs to do. This is like the feedforward layer of the decoder block, where the decoder takes the understanding from the causal self-attention and the cross-attention and builds a new representation of the context.
+- The engineer can do this process of "look at what code has been done" -> "look at the product spec" -> "refine understanding" a few times, representing the `N` blocks of the decoder module.
+- Finally, based on multiple rounds of understanding what they're supposed to do, the engineer can generate the code. This represents the actual linear and softmax layers of the transformer.
+- The next day, the engineer can log on, and take the exact same product specs (the same output from the decoder), plus what they produced today (from the decoder + linear + softmax) and then continue with their "autoregressive code generation" task.
+
+This analogy also highlights one key difference between the encoder and decoder steps. The product team (encoder) processes all requirements at once, while the engineer (decoder) works step-by-step, building one piece at a time. In a similar way, the encoder is fully parallel while the decoder is autoregressive.
+
+### Why this isn't what's used in ChatGPT
+
+(... how generation for ChatGPT is different from machine translation ...)
+
+### Why we should start here anyways
+
+(... this is the original transformer ...)
+(... seeing how the encoder + decoder architecture works will help us understand encoder-only and decoder-only setups ...)
+
 ## Transformer architecture input/output
 
 $$
