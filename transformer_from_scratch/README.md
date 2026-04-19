@@ -4,6 +4,8 @@ Our goal is to implement the following architecture from the original transforme
 
 ![Original Transformer Architecture](static/the-annotated-transformer.png)
 
+This folder contains a workthrough of Karpathy's [nanoGPT video](https://www.youtube.com/watch?v=kCc8FmEb1nY). The associated GitHub repo for the original implementation is [in this link](https://github.com/karpathy/nanoGPT)
+
 ## Core symbols
 
 - B: batch size
