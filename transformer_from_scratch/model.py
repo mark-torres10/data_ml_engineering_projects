@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import inspect
 import math
-from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+
+from transformer_from_scratch.config import GPTConfig
 
 
 class LayerNorm(nn.Module):
@@ -21,57 +22,59 @@ class LayerNorm(nn.Module):
         return F.layer_norm(x, self.weight.shape, self.weight, self.bias, 1e-5)
 
 
-class CausalSelfAttention(nn.Module):
-    """Multi-head causal self-attention."""
+class MultiAttentionHead(nn.Module):
+    """Projects hidden states to multi-head Q/K/V and merges heads back."""
 
     def __init__(self, config: GPTConfig) -> None:
         super().__init__()
         if config.n_embd % config.n_head != 0:
             raise ValueError("n_embd must be divisible by n_head")
-
+        self.n_head = config.n_head
+        self.n_embd = config.n_embd
+        self.head_size = config.n_embd // config.n_head
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
+
+    def project_qkv(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        bsz, seq_len, _ = x.size()
+        q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
+        k = k.view(bsz, seq_len, self.n_head, self.head_size).transpose(1, 2)
+        q = q.view(bsz, seq_len, self.n_head, self.head_size).transpose(1, 2)
+        v = v.view(bsz, seq_len, self.n_head, self.head_size).transpose(1, 2)
+        return q, k, v
+
+    def merge_heads(self, x: torch.Tensor) -> torch.Tensor:
+        bsz, _, seq_len, _ = x.size()
+        return x.transpose(1, 2).contiguous().view(bsz, seq_len, self.n_embd)
+
+
+class CausalSelfAttention(nn.Module):
+    """Multi-head causal self-attention."""
+
+    def __init__(self, config: GPTConfig) -> None:
+        super().__init__()
+        self.multi_head = MultiAttentionHead(config)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
-        self.n_head = config.n_head
-        self.n_embd = config.n_embd
         self.dropout = config.dropout
-
-        self.flash = hasattr(F, "scaled_dot_product_attention")
-        if not self.flash:
-            self.register_buffer(
-                "bias",
-                torch.tril(torch.ones(config.block_size, config.block_size)).view(
-                    1, 1, config.block_size, config.block_size
-                ),
-            )
+        self.register_buffer(
+            "bias",
+            torch.tril(torch.ones(config.block_size, config.block_size)).view(
+                1, 1, config.block_size, config.block_size
+            ),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        bsz, seq_len, channels = x.size()
-        q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
+        _, seq_len, _ = x.size()
+        q, k, v = self.multi_head.project_qkv(x)
 
-        head_size = channels // self.n_head
-        k = k.view(bsz, seq_len, self.n_head, head_size).transpose(1, 2)
-        q = q.view(bsz, seq_len, self.n_head, head_size).transpose(1, 2)
-        v = v.view(bsz, seq_len, self.n_head, head_size).transpose(1, 2)
+        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(self.multi_head.head_size))
+        att = att.masked_fill(self.bias[:, :, :seq_len, :seq_len] == 0, float("-inf"))
+        att = F.softmax(att, dim=-1)
+        att = self.attn_dropout(att)
+        y = att @ v
 
-        if self.flash:
-            y = F.scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                attn_mask=None,
-                dropout_p=self.dropout if self.training else 0.0,
-                is_causal=True,
-            )
-        else:
-            att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(head_size))
-            att = att.masked_fill(self.bias[:, :, :seq_len, :seq_len] == 0, float("-inf"))
-            att = F.softmax(att, dim=-1)
-            att = self.attn_dropout(att)
-            y = att @ v
-
-        y = y.transpose(1, 2).contiguous().view(bsz, seq_len, channels)
+        y = self.multi_head.merge_heads(y)
         return self.resid_dropout(self.c_proj(y))
 
 
@@ -106,18 +109,6 @@ class TransformerBlock(nn.Module):
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
-
-
-@dataclass
-class GPTConfig:
-    block_size: int = 1024
-    vocab_size: int = 50304
-    n_layer: int = 12
-    n_head: int = 12
-    n_embd: int = 768
-    dropout: float = 0.0
-    bias: bool = True
-
 
 class GPT(nn.Module):
     """Decoder-only GPT language model."""
@@ -236,7 +227,7 @@ class GPT(nn.Module):
         sd_keys_hf = [k for k in sd_keys_hf if not k.endswith(".attn.bias")]
 
         transposed = [
-            "attn.c_attn.weight",
+            "attn.multi_head.c_attn.weight",
             "attn.c_proj.weight",
             "mlp.c_fc.weight",
             "mlp.c_proj.weight",
