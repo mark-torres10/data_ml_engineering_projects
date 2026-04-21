@@ -11,21 +11,17 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
-import urllib.request
 
 import torch
 
-from transformer_from_scratch.model import GPT, GPTConfig
 from transformer_from_scratch.config import TrainConfig
+from transformer_from_scratch.dataloader import Dataloader
+from transformer_from_scratch.model import GPT, GPTConfig
 
-TINY_SHAKESPEARE_URL = (
-    "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
-)
 
 @dataclass
 class LossEvent:
-    step: int
+    epoch: int
     train_loss: float
     val_loss: float
     wall_time: str
@@ -48,14 +44,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def ensure_tiny_shakespeare(dataset_path: Path) -> None:
-    dataset_path.parent.mkdir(parents=True, exist_ok=True)
-    if dataset_path.exists():
-        return
-    print(f"Downloading Tiny Shakespeare dataset to {dataset_path}...")
-    urllib.request.urlretrieve(TINY_SHAKESPEARE_URL, dataset_path)
-
-
 def make_output_dir(output_root: Path) -> Path:
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     output_dir = output_root / timestamp
@@ -63,59 +51,119 @@ def make_output_dir(output_root: Path) -> Path:
     return output_dir
 
 
-def build_vocab(text: str) -> tuple[dict[str, int], dict[int, str]]:
-    chars = sorted(set(text))
-    stoi = {ch: i for i, ch in enumerate(chars)}
-    itos = {i: ch for i, ch in enumerate(chars)}
-    return stoi, itos
+class GptTrainer:
+    def __init__(
+        self,
+        cfg: TrainConfig,
+        dataloader: Dataloader,
+        output_dir: Path,
+        dataset_path: Path,
+    ) -> None:
+        self.cfg = cfg
+        self.dataloader = dataloader
+        self.output_dir = output_dir
+        self.dataset_path = dataset_path
+        self.history: list[LossEvent] = []
 
+        model_cfg = GPTConfig(
+            block_size=cfg.block_size,
+            vocab_size=dataloader.vocab_size,
+            n_layer=cfg.n_layer,
+            n_head=cfg.n_head,
+            n_embd=cfg.n_embd,
+            dropout=cfg.dropout,
+        )
+        self.model_cfg = model_cfg
+        self.model = GPT(model_cfg).to(cfg.device)
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=cfg.learning_rate,
+            betas=(cfg.beta1, cfg.beta2),
+            weight_decay=cfg.weight_decay,
+        )
 
-def encode(text: str, stoi: dict[str, int]) -> list[int]:
-    return [stoi[ch] for ch in text]
+    @torch.no_grad()
+    def estimate_loss(self) -> dict[str, float]:
+        self.model.eval()
 
-
-def get_batch(
-    split: Literal["train", "val"],
-    train_data: torch.Tensor,
-    val_data: torch.Tensor,
-    batch_size: int,
-    block_size: int,
-    device: str,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    data = train_data if split == "train" else val_data
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack([data[i : i + block_size] for i in ix])
-    y = torch.stack([data[i + 1 : i + block_size + 1] for i in ix])
-    return x.to(device), y.to(device)
-
-
-@torch.no_grad()
-def estimate_loss(
-    model: GPT,
-    train_data: torch.Tensor,
-    val_data: torch.Tensor,
-    cfg: TrainConfig,
-) -> dict[str, float]:
-    out: dict[str, float] = {}
-    model.eval()
-    for split in ("train", "val"):
-        losses = torch.zeros(cfg.eval_iters)
-        for k in range(cfg.eval_iters):
-            xb, yb = get_batch(
-                split=split,
-                train_data=train_data,
-                val_data=val_data,
-                batch_size=cfg.batch_size,
-                block_size=cfg.block_size,
-                device=cfg.device,
-            )
-            _, loss = model(xb, yb)
+        train_losses = torch.zeros(self.cfg.eval_iters)
+        for k in range(self.cfg.eval_iters):
+            xb, yb = self.dataloader.get_batch(split="train")
+            _, loss = self.model(xb, yb)
             if loss is None:
-                raise RuntimeError("Loss should not be None during evaluation.")
-            losses[k] = loss.item()
-        out[split] = losses.mean().item()
-    model.train()
-    return out
+                raise RuntimeError("Loss should not be None during train evaluation.")
+            train_losses[k] = loss.item()
+
+        val_losses = torch.zeros(self.cfg.eval_iters)
+        for k in range(self.cfg.eval_iters):
+            xb, yb = self.dataloader.get_batch(split="val")
+            _, loss = self.model(xb, yb)
+            if loss is None:
+                raise RuntimeError("Loss should not be None during val evaluation.")
+            val_losses[k] = loss.item()
+
+        self.model.train()
+        return {
+            "train": train_losses.mean().item(),
+            "val": val_losses.mean().item(),
+        }
+
+    def save_run_metadata(self) -> None:
+        metadata = {
+            "train_config": asdict(self.cfg),
+            "model_config": asdict(self.model_cfg),
+            "dataset_path": str(self.dataset_path),
+            "output_dir": str(self.output_dir),
+            "vocab_size": self.dataloader.vocab_size,
+            "train_tokens": self.dataloader.train_tokens,
+            "val_tokens": self.dataloader.val_tokens,
+        }
+        (self.output_dir / "run_config.json").write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
+        (self.output_dir / "vocab.json").write_text(
+            json.dumps({"stoi": self.dataloader.stoi, "itos": self.dataloader.itos}, indent=2),
+            encoding="utf-8",
+        )
+
+    def train(self) -> None:
+        self.save_run_metadata()
+
+        print(f"Output directory: {self.output_dir}")
+        print(
+            f"Training on {self.cfg.device} with vocab_size={self.dataloader.vocab_size}, "
+            f"train_tokens={self.dataloader.train_tokens}, val_tokens={self.dataloader.val_tokens}"
+        )
+
+        for epoch in range(self.cfg.max_epochs + 1):
+            if epoch % self.cfg.eval_interval == 0 or epoch == self.cfg.max_epochs:
+                losses = self.estimate_loss()
+                event = LossEvent(
+                    epoch=epoch,
+                    train_loss=losses["train"],
+                    val_loss=losses["val"],
+                    wall_time=datetime.now().isoformat(timespec="seconds"),
+                )
+                self.history.append(event)
+                print(
+                    f"epoch {epoch:5d} | train loss {event.train_loss:.4f} | "
+                    f"val loss {event.val_loss:.4f}"
+                )
+
+            xb, yb = self.dataloader.get_batch(split="train")
+            _, loss = self.model(xb, yb)
+            if loss is None:
+                raise RuntimeError("Loss should not be None during training.")
+
+            self.optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            self.optimizer.step()
+
+        (self.output_dir / "loss_history.json").write_text(
+            json.dumps([asdict(event) for event in self.history], indent=2), encoding="utf-8"
+        )
+        torch.save(self.model.state_dict(), self.output_dir / "model.pt")
+        print(f"Training complete. Saved model and logs to {self.output_dir}")
 
 
 def main() -> None:
@@ -123,92 +171,20 @@ def main() -> None:
     cfg = TrainConfig()
     torch.manual_seed(cfg.seed)
 
-    ensure_tiny_shakespeare(args.dataset_path)
-    output_dir = make_output_dir(args.output_root)
-
-    text = args.dataset_path.read_text(encoding="utf-8")
-    stoi, itos = build_vocab(text)
-    data = torch.tensor(encode(text, stoi), dtype=torch.long)
-
-    split_index = int(0.9 * len(data))
-    train_data = data[:split_index]
-    val_data = data[split_index:]
-
-    model_cfg = GPTConfig(
+    dataloader = Dataloader(
+        dataset_path=args.dataset_path,
+        batch_size=cfg.batch_size,
         block_size=cfg.block_size,
-        vocab_size=len(stoi),
-        n_layer=cfg.n_layer,
-        n_head=cfg.n_head,
-        n_embd=cfg.n_embd,
-        dropout=cfg.dropout,
+        device=cfg.device,
     )
-    model = GPT(model_cfg).to(cfg.device)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=cfg.learning_rate,
-        betas=(cfg.beta1, cfg.beta2),
-        weight_decay=cfg.weight_decay,
+    output_dir = make_output_dir(args.output_root)
+    trainer = GptTrainer(
+        cfg=cfg,
+        dataloader=dataloader,
+        output_dir=output_dir,
+        dataset_path=args.dataset_path,
     )
-
-    metadata = {
-        "train_config": asdict(cfg),
-        "model_config": asdict(model_cfg),
-        "dataset_path": str(args.dataset_path),
-        "output_dir": str(output_dir),
-        "vocab_size": len(stoi),
-        "train_tokens": int(train_data.numel()),
-        "val_tokens": int(val_data.numel()),
-    }
-    (output_dir / "run_config.json").write_text(
-        json.dumps(metadata, indent=2), encoding="utf-8"
-    )
-    (output_dir / "vocab.json").write_text(
-        json.dumps({"stoi": stoi, "itos": itos}, indent=2), encoding="utf-8"
-    )
-
-    history: list[LossEvent] = []
-    print(f"Output directory: {output_dir}")
-    print(
-        f"Training on {cfg.device} with vocab_size={len(stoi)}, "
-        f"train_tokens={train_data.numel()}, val_tokens={val_data.numel()}"
-    )
-
-    for step in range(cfg.max_iters + 1):
-        if step % cfg.eval_interval == 0 or step == cfg.max_iters:
-            losses = estimate_loss(model, train_data, val_data, cfg)
-            event = LossEvent(
-                step=step,
-                train_loss=losses["train"],
-                val_loss=losses["val"],
-                wall_time=datetime.now().isoformat(timespec="seconds"),
-            )
-            history.append(event)
-            print(
-                f"step {step:5d} | train loss {event.train_loss:.4f} | "
-                f"val loss {event.val_loss:.4f}"
-            )
-
-        xb, yb = get_batch(
-            split="train",
-            train_data=train_data,
-            val_data=val_data,
-            batch_size=cfg.batch_size,
-            block_size=cfg.block_size,
-            device=cfg.device,
-        )
-        _, loss = model(xb, yb)
-        if loss is None:
-            raise RuntimeError("Loss should not be None during training.")
-
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
-
-    (output_dir / "loss_history.json").write_text(
-        json.dumps([asdict(event) for event in history], indent=2), encoding="utf-8"
-    )
-    torch.save(model.state_dict(), output_dir / "model.pt")
-    print(f"Training complete. Saved model and logs to {output_dir}")
+    trainer.train()
 
 
 if __name__ == "__main__":
