@@ -114,7 +114,7 @@ class GptTrainer:
         }
 
     def save_run_metadata(self) -> None:
-        """Exports the run metadata + vocabulary to the output directory."""
+        """Exports run metadata to the output directory."""
         metadata = {
             "train_config": asdict(self.cfg),
             "model_config": asdict(self.model_cfg),
@@ -125,10 +125,8 @@ class GptTrainer:
             "val_tokens": self.dataloader.val_tokens,
         }
         run_config_path = self.output_dir / "run_config.json"
-        vocab_path = self.output_dir / "vocab.json"
 
         run_config_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-        vocab_path.write_text(json.dumps({"stoi": self.dataloader.stoi, "itos": self.dataloader.itos}, indent=2), encoding="utf-8")
 
     def evaluate_and_log_epoch(self, epoch: int) -> None:
         """Runs periodic evaluation, appends metrics, and prints status."""
