@@ -59,6 +59,7 @@ class GptTrainer:
         output_dir: Path,
         dataset_path: Path,
     ) -> None:
+        """Initializes the GPT trainer."""
         self.cfg = cfg
         self.dataloader = dataloader
         self.output_dir = output_dir
@@ -84,23 +85,27 @@ class GptTrainer:
 
     @torch.no_grad()
     def estimate_loss(self) -> dict[str, float]:
+        """Esimating the loss. Computing exact loss over the entire dataset is
+        expensive and we do this for logging purposes anyways. Instead,
+        we do random Monte-Carlo style estimates from random mini-batches.
+        """
         self.model.eval()
 
         train_losses = torch.zeros(self.cfg.eval_iters)
-        for k in range(self.cfg.eval_iters):
-            xb, yb = self.dataloader.get_batch(split="train")
-            _, loss = self.model(xb, yb)
+        for eval_iter in range(self.cfg.eval_iters):
+            batch_x, batch_y = self.dataloader.get_batch(split="train")
+            _, loss = self.model(batch_x, batch_y)
             if loss is None:
                 raise RuntimeError("Loss should not be None during train evaluation.")
-            train_losses[k] = loss.item()
+            train_losses[eval_iter] = loss.item()
 
         val_losses = torch.zeros(self.cfg.eval_iters)
-        for k in range(self.cfg.eval_iters):
-            xb, yb = self.dataloader.get_batch(split="val")
-            _, loss = self.model(xb, yb)
+        for eval_iter in range(self.cfg.eval_iters):
+            batch_x, batch_y = self.dataloader.get_batch(split="val")
+            _, loss = self.model(batch_x, batch_y)
             if loss is None:
                 raise RuntimeError("Loss should not be None during val evaluation.")
-            val_losses[k] = loss.item()
+            val_losses[eval_iter] = loss.item()
 
         self.model.train()
         return {
@@ -109,6 +114,7 @@ class GptTrainer:
         }
 
     def save_run_metadata(self) -> None:
+        """Exports the run metadata + vocabulary to the output directory."""
         metadata = {
             "train_config": asdict(self.cfg),
             "model_config": asdict(self.model_cfg),
@@ -118,15 +124,29 @@ class GptTrainer:
             "train_tokens": self.dataloader.train_tokens,
             "val_tokens": self.dataloader.val_tokens,
         }
-        (self.output_dir / "run_config.json").write_text(
-            json.dumps(metadata, indent=2), encoding="utf-8"
+        run_config_path = self.output_dir / "run_config.json"
+        vocab_path = self.output_dir / "vocab.json"
+
+        run_config_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        vocab_path.write_text(json.dumps({"stoi": self.dataloader.stoi, "itos": self.dataloader.itos}, indent=2), encoding="utf-8")
+
+    def evaluate_and_log_epoch(self, epoch: int) -> None:
+        """Runs periodic evaluation, appends metrics, and prints status."""
+        losses = self.estimate_loss()
+        event = LossEvent(
+            epoch=epoch,
+            train_loss=losses["train"],
+            val_loss=losses["val"],
+            wall_time=datetime.now().isoformat(timespec="seconds"),
         )
-        (self.output_dir / "vocab.json").write_text(
-            json.dumps({"stoi": self.dataloader.stoi, "itos": self.dataloader.itos}, indent=2),
-            encoding="utf-8",
+        self.history.append(event)
+        print(
+            f"epoch {epoch:5d} | train loss {event.train_loss:.4f} | "
+            f"val loss {event.val_loss:.4f}"
         )
 
     def train(self) -> None:
+        """Trains the model."""
         self.save_run_metadata()
 
         print(f"Output directory: {self.output_dir}")
@@ -135,23 +155,15 @@ class GptTrainer:
             f"train_tokens={self.dataloader.train_tokens}, val_tokens={self.dataloader.val_tokens}"
         )
 
-        for epoch in range(self.cfg.max_epochs + 1):
-            if epoch % self.cfg.eval_interval == 0 or epoch == self.cfg.max_epochs:
-                losses = self.estimate_loss()
-                event = LossEvent(
-                    epoch=epoch,
-                    train_loss=losses["train"],
-                    val_loss=losses["val"],
-                    wall_time=datetime.now().isoformat(timespec="seconds"),
-                )
-                self.history.append(event)
-                print(
-                    f"epoch {epoch:5d} | train loss {event.train_loss:.4f} | "
-                    f"val loss {event.val_loss:.4f}"
-                )
+        total_epochs = self.cfg.max_epochs + 1
 
-            xb, yb = self.dataloader.get_batch(split="train")
-            _, loss = self.model(xb, yb)
+        for epoch in range(total_epochs):
+
+            if epoch % self.cfg.eval_interval == 0 or epoch == self.cfg.max_epochs:
+                self.evaluate_and_log_epoch(epoch)
+
+            batch_x, batch_y = self.dataloader.get_batch(split="train")
+            _, loss = self.model(batch_x, batch_y)
             if loss is None:
                 raise RuntimeError("Loss should not be None during training.")
 
@@ -159,11 +171,12 @@ class GptTrainer:
             loss.backward()
             self.optimizer.step()
 
-        (self.output_dir / "loss_history.json").write_text(
-            json.dumps([asdict(event) for event in self.history], indent=2), encoding="utf-8"
-        )
-        torch.save(self.model.state_dict(), self.output_dir / "model.pt")
-        print(f"Training complete. Saved model and logs to {self.output_dir}")
+        loss_history_path = self.output_dir / "loss_history.json"
+        loss_history_path.write_text(json.dumps([asdict(event) for event in self.history], indent=2), encoding="utf-8")
+
+        output_model_path = self.output_dir / "model.pt"
+        torch.save(self.model.state_dict(), output_model_path)
+        print(f"Training complete. Saved model and logs to {output_model_path}")
 
 
 def main() -> None:
