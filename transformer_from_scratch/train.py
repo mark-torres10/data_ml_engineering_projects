@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
+import wandb
 
 from transformer_from_scratch.config import TrainConfig
 from transformer_from_scratch.dataloader import Dataloader
@@ -82,6 +83,29 @@ class GptTrainer:
             betas=(cfg.beta1, cfg.beta2),
             weight_decay=cfg.weight_decay,
         )
+        self.wandb_run: wandb.sdk.wandb_run.Run | None = None
+
+    def init_wandb(self) -> None:
+        """Initializes a Weights & Biases run for this training job."""
+        if not self.cfg.use_wandb:
+            return
+        self.wandb_run = wandb.init(
+            project=self.cfg.wandb_project,
+            entity=self.cfg.wandb_entity,
+            name=self.cfg.wandb_run_name,
+            mode=self.cfg.wandb_mode,
+            dir=str(self.output_dir),
+            config={
+                "train_config": asdict(self.cfg),
+                "model_config": asdict(self.model_cfg),
+                "dataset_path": str(self.dataset_path),
+            },
+        )
+
+    def log_to_wandb(self, metrics: dict[str, float], epoch: int) -> None:
+        if not self.wandb_run:
+            return
+        wandb.log(metrics, step=epoch)
 
     @torch.no_grad()
     def estimate_loss(self) -> dict[str, float]:
@@ -142,10 +166,20 @@ class GptTrainer:
             f"epoch {epoch:5d} | train loss {event.train_loss:.4f} | "
             f"val loss {event.val_loss:.4f}"
         )
+        self.log_to_wandb(
+            metrics={
+                "epoch": float(epoch),
+                "train/loss": event.train_loss,
+                "val/loss": event.val_loss,
+                "train/lr": self.optimizer.param_groups[0]["lr"],
+            },
+            epoch=epoch,
+        )
 
     def train(self) -> None:
         """Trains the model."""
         self.save_run_metadata()
+        self.init_wandb()
 
         print(f"Output directory: {self.output_dir}")
         print(
@@ -155,26 +189,40 @@ class GptTrainer:
 
         total_epochs = self.cfg.max_epochs + 1
 
-        for epoch in range(total_epochs):
+        try:
+            for epoch in range(total_epochs):
 
-            if epoch % self.cfg.eval_interval == 0 or epoch == self.cfg.max_epochs:
-                self.evaluate_and_log_epoch(epoch)
+                if epoch % self.cfg.eval_interval == 0 or epoch == self.cfg.max_epochs:
+                    self.evaluate_and_log_epoch(epoch)
 
-            batch_x, batch_y = self.dataloader.get_batch(split="train")
-            _, loss = self.model(batch_x, batch_y)
-            if loss is None:
-                raise RuntimeError("Loss should not be None during training.")
+                batch_x, batch_y = self.dataloader.get_batch(split="train")
+                _, loss = self.model(batch_x, batch_y)
+                if loss is None:
+                    raise RuntimeError("Loss should not be None during training.")
 
-            self.optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            self.optimizer.step()
+                self.optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                self.optimizer.step()
+                self.log_to_wandb(
+                    metrics={
+                        "epoch": float(epoch),
+                        "train/loss_step": loss.item(),
+                    },
+                    epoch=epoch,
+                )
 
-        loss_history_path = self.output_dir / "loss_history.json"
-        loss_history_path.write_text(json.dumps([asdict(event) for event in self.history], indent=2), encoding="utf-8")
+            loss_history_path = self.output_dir / "loss_history.json"
+            loss_history_path.write_text(
+                json.dumps([asdict(event) for event in self.history], indent=2),
+                encoding="utf-8",
+            )
 
-        output_model_path = self.output_dir / "model.pt"
-        torch.save(self.model.state_dict(), output_model_path)
-        print(f"Training complete. Saved model and logs to {output_model_path}")
+            output_model_path = self.output_dir / "model.pt"
+            torch.save(self.model.state_dict(), output_model_path)
+            print(f"Training complete. Saved model and logs to {output_model_path}")
+        finally:
+            if self.wandb_run:
+                self.wandb_run.finish()
 
 
 def main() -> None:

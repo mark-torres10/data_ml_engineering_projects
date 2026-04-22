@@ -20,6 +20,11 @@ class TrainConfig:
     dropout: float = 0.1
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     seed: int = 1337
+    use_wandb: bool = True
+    wandb_project: str = "transformer-from-scratch"
+    wandb_entity: str | None = None
+    wandb_run_name: str | None = None
+    wandb_mode: str = "online"
 
 
 @dataclass
