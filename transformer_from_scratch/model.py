@@ -11,7 +11,10 @@ from transformer_from_scratch.config import GPTConfig
 
 
 class LayerNorm(nn.Module):
-    """LayerNorm with optional bias for GPT-2 parity."""
+    """LayerNorm with optional bias for GPT-2 parity.
+    
+    GPT-2 didn't have it, according to NanoGPT, but the PyTorch
+    implementation does. So we're going to keep it optional."""
 
     def __init__(self, ndim: int, bias: bool) -> None:
         super().__init__()
@@ -35,6 +38,7 @@ class MultiAttentionHead(nn.Module):
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
 
     def project_qkv(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Projects the input tensor `x` to Q, K, and V tensors."""
         bsz, seq_len, _ = x.size()
         q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
         k = k.view(bsz, seq_len, self.n_head, self.head_size).transpose(1, 2)
@@ -43,6 +47,7 @@ class MultiAttentionHead(nn.Module):
         return q, k, v
 
     def merge_heads(self, x: torch.Tensor) -> torch.Tensor:
+        """Merges the heads of the input tensor `x`."""
         bsz, _, seq_len, _ = x.size()
         return x.transpose(1, 2).contiguous().view(bsz, seq_len, self.n_embd)
 
