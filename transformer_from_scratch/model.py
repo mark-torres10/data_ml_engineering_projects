@@ -69,6 +69,8 @@ class CausalSelfAttention(nn.Module):
         q, k, v = self.multi_head.project_qkv(x)
 
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(self.multi_head.head_size))
+
+        # add causal mask to the attention scores
         att = att.masked_fill(self.bias[:, :, :seq_len, :seq_len] == 0, float("-inf"))
         att = F.softmax(att, dim=-1)
         att = self.attn_dropout(att)
@@ -154,21 +156,34 @@ class GPT(nn.Module):
         self, idx: torch.Tensor, targets: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         device = idx.device
-        bsz, seq_len = idx.size()
+        _, seq_len = idx.size()
         if seq_len > self.config.block_size:
             raise ValueError(
                 f"Cannot forward sequence of length {seq_len}, block size is only {self.config.block_size}"
             )
 
+        # build position indices
         pos = torch.arange(0, seq_len, dtype=torch.long, device=device)
+
+        # do token embedding lookup for each position, getting the embedding
+        # tensor for each position
         tok_emb = self.transformer.wte(idx)
+
+        # do positional embedding lookup for each position, getting the embedding
+        # tensor for each position
         pos_emb = self.transformer.wpe(pos)
+
+        # adds position embeddings to token embeddings. also applies dropout.
         x = self.transformer.drop(tok_emb + pos_emb)
 
+        # apply each transformer block to the input
         for block in self.transformer.h:
             x = block(x)
+
+        # final layer normalization
         x = self.transformer.ln_f(x)
 
+        # apply the linear head project
         if targets is not None:
             logits = self.lm_head(x)
             loss = F.cross_entropy(
