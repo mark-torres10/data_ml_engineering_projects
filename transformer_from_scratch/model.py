@@ -195,78 +195,6 @@ class GPT(nn.Module):
 
         return logits, loss
 
-    def crop_block_size(self, block_size: int) -> None:
-        if block_size > self.config.block_size:
-            raise ValueError("block_size must be <= current model block_size")
-        self.config.block_size = block_size
-        self.transformer.wpe.weight = nn.Parameter(self.transformer.wpe.weight[:block_size])
-        for block in self.transformer.h:
-            if hasattr(block.attn, "bias"):
-                block.attn.bias = block.attn.bias[:, :, :block_size, :block_size]
-
-    @classmethod
-    def from_pretrained(
-        cls, model_type: str, override_args: dict[str, float] | None = None
-    ) -> GPT:
-        allowed = {"gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"}
-        if model_type not in allowed:
-            raise ValueError(f"model_type must be one of {sorted(allowed)}")
-
-        override_args = override_args or {}
-        if not all(k == "dropout" for k in override_args):
-            raise ValueError("Only 'dropout' override is supported")
-
-        from transformers import GPT2LMHeadModel
-
-        config_args = {
-            "gpt2": dict(n_layer=12, n_head=12, n_embd=768),
-            "gpt2-medium": dict(n_layer=24, n_head=16, n_embd=1024),
-            "gpt2-large": dict(n_layer=36, n_head=20, n_embd=1280),
-            "gpt2-xl": dict(n_layer=48, n_head=25, n_embd=1600),
-        }[model_type]
-
-        config_args["vocab_size"] = 50257
-        config_args["block_size"] = 1024
-        config_args["bias"] = True
-        if "dropout" in override_args:
-            config_args["dropout"] = override_args["dropout"]
-
-        config = GPTConfig(**config_args)
-        model = GPT(config)
-        sd = model.state_dict()
-        sd_keys = [k for k in sd.keys() if not k.endswith(".attn.bias")]
-
-        model_hf = GPT2LMHeadModel.from_pretrained(model_type)
-        sd_hf = model_hf.state_dict()
-        sd_keys_hf = [k for k in sd_hf.keys() if not k.endswith(".attn.masked_bias")]
-        sd_keys_hf = [k for k in sd_keys_hf if not k.endswith(".attn.bias")]
-
-        transposed = [
-            "attn.multi_head.c_attn.weight",
-            "attn.c_proj.weight",
-            "mlp.c_fc.weight",
-            "mlp.c_proj.weight",
-        ]
-
-        if len(sd_keys_hf) != len(sd_keys):
-            raise ValueError(
-                f"mismatched keys: {len(sd_keys_hf)} != {len(sd_keys)}"
-            )
-
-        for key in sd_keys_hf:
-            if any(key.endswith(w) for w in transposed):
-                if sd_hf[key].shape[::-1] != sd[key].shape:
-                    raise ValueError(f"shape mismatch for {key}")
-                with torch.no_grad():
-                    sd[key].copy_(sd_hf[key].t())
-            else:
-                if sd_hf[key].shape != sd[key].shape:
-                    raise ValueError(f"shape mismatch for {key}")
-                with torch.no_grad():
-                    sd[key].copy_(sd_hf[key])
-
-        return model
-
     def configure_optimizers(
         self,
         weight_decay: float,
@@ -288,20 +216,6 @@ class GPT(nn.Module):
         return torch.optim.AdamW(
             optim_groups, lr=learning_rate, betas=betas, **extra_args
         )
-
-    def estimate_mfu(self, fwdbwd_per_iter: int, dt: float) -> float:
-        n_params = self.get_num_params()
-        cfg = self.config
-        layers = cfg.n_layer
-        heads = cfg.n_head
-        head_dim = cfg.n_embd // cfg.n_head
-        context = cfg.block_size
-        flops_per_token = 6 * n_params + 12 * layers * heads * head_dim * context
-        flops_per_fwdbwd = flops_per_token * context
-        flops_per_iter = flops_per_fwdbwd * fwdbwd_per_iter
-        flops_achieved = flops_per_iter * (1.0 / dt)
-        flops_promised = 312e12
-        return flops_achieved / flops_promised
 
     @torch.no_grad()
     def generate(
