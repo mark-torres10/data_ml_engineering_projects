@@ -1,0 +1,33 @@
+{
+  "train_config": {
+    "batch_size": 64,
+    "block_size": 128,
+    "max_iters": 5000,
+    "eval_interval": 250,
+    "eval_iters": 100,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.1,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.1,
+    "device": "cpu",
+    "seed": 1337
+  },
+  "model_config": {
+    "block_size": 128,
+    "vocab_size": 65,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.1,
+    "bias": true
+  },
+  "dataset_path": "transformer_from_scratch/input.txt",
+  "output_dir": "transformer_from_scratch/output/2026-04-21_13:41:15",
+  "vocab_size": 65,
+  "train_tokens": 1003854,
+  "val_tokens": 111540
+}
